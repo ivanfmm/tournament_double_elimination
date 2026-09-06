@@ -1,0 +1,51 @@
+version: "3.9"
+
+networks:
+  development:
+    name: development
+    driver: bridge
+
+volumes:
+  tournament_pgdata:
+    name: tournament_pgdata
+
+services:
+
+  tournament_db:
+    image: postgres:17.6-alpine3.22
+    container_name: tournament_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tournament
+    ports:
+      - "5432:5432"
+    volumes:
+      - tournament_pgdata:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:Z
+    networks:
+      - development
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tournament_api:
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: tournament_api
+    restart: unless-stopped
+    depends_on:
+      tournament_db:
+        condition: service_healthy
+    environment:
+      # ASP.NET lee esto y sobreescribe appsettings.json
+      ConnectionStrings__Default: "Host=tournament_db;Port=5432;Database=tournament;Username=postgres;Password=password"
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+    ports:
+      - "8081:8080"
+    networks:
+      - development

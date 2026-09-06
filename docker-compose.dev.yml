@@ -1,0 +1,58 @@
+version: "3.9"
+
+networks:
+  development:
+    name: development
+    driver: bridge
+
+volumes:
+  tournament_pgdata:
+    name: tournament_pgdata
+  api_obj:
+  api_bin:
+
+services:
+
+  tournament_db:
+    image: postgres:17.6-alpine3.22
+    container_name: tournament_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tournament
+    ports:
+      - "5432:5432"
+    volumes:
+      - tournament_pgdata:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:Z
+    networks:
+      - development
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tournament_api_dev:
+    build:
+      context: .
+      dockerfile: Containerfile.dev
+    container_name: tournament_api_dev
+    depends_on:
+      tournament_db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: "Host=tournament_db;Port=5432;Database=tournament;Username=postgres;Password=password"
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+    volumes:
+      - .:/workspace:Z
+      # Volumen "anónimo" para que obj/ y bin/ del contenedor
+      # no se mezclen con los que generes si compilas también en Fedora.
+      - api_obj:/workspace/Tournament.Api/obj
+      - api_bin:/workspace/Tournament.Api/bin
+    ports:
+      - "8081:8080"
+    networks:
+      - development
+

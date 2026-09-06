@@ -1,0 +1,34 @@
+{
+  "name": "Tournament API (ASP.NET 10 Dev Container)",
+
+  // Le dice a VS Code que use tu docker-compose de desarrollo,
+  // no el de producción.
+  "dockerComposeFile": "../docker-compose.dev.yml",
+
+  // A qué servicio del compose se conecta VS Code.
+  "service": "tournament_api_dev",
+
+  // Carpeta dentro del contenedor donde ya está montado tu código
+  // (coincide con el volumen ".:/workspace" del compose).
+  "workspaceFolder": "/workspace",
+
+  // Para que Postgres también quede disponible/arrancado al abrir el dev container.
+  "runServices": ["tournament_db", "tournament_api_dev"],
+
+  // Extensiones que se instalan automáticamente DENTRO del contenedor.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.csharp",
+        "ms-azuretools.vscode-containers"
+      ]
+    }
+  },
+
+  // Se ejecuta una vez, la primera vez que se crea el contenedor.
+  "postCreateCommand": "dotnet restore",
+
+  // Usuario con el que VS Code entra al contenedor.
+  "remoteUser": "root"
+}
