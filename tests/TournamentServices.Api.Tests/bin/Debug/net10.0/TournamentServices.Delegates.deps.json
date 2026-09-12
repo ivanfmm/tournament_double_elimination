@@ -1,0 +1,56 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "TournamentServices.Delegates/1.0.0": {
+        "dependencies": {
+          "TournamentServices.Domain": "1.0.0",
+          "TournamentServices.Repositories": "1.0.0"
+        },
+        "runtime": {
+          "TournamentServices.Delegates.dll": {}
+        }
+      },
+      "TournamentServices.Domain/1.0.0": {
+        "runtime": {
+          "TournamentServices.Domain.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "TournamentServices.Repositories/1.0.0": {
+        "dependencies": {
+          "TournamentServices.Domain": "1.0.0"
+        },
+        "runtime": {
+          "TournamentServices.Repositories.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "TournamentServices.Delegates/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "TournamentServices.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "TournamentServices.Repositories/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

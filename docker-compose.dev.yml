@@ -49,8 +49,8 @@ services:
       - .:/workspace:Z
       # Volumen "anónimo" para que obj/ y bin/ del contenedor
       # no se mezclen con los que generes si compilas también en Fedora.
-      - api_obj:/workspace/Tournament.Api/obj
-      - api_bin:/workspace/Tournament.Api/bin
+      - api_obj:/workspace/src/TournamentServices.Api/obj
+      - api_bin:/workspace/src/TournamentServices.Api/bin
     ports:
       - "8081:8080"
     networks:

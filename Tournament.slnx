@@ -1,7 +1,0 @@
-<Solution>
-  <Project Path="Tournament.Api/Tournament.Api.csproj" />
-  <Project Path="Tournament.Common/Tournament.Common.csproj" />
-  <Project Path="Tournament.Delegate/Tournament.Delegate.csproj" />
-  <Project Path="Tournament.Domain/Tournament.Domain.csproj" />
-  <Project Path="Tournament.Repository/Tournament.Repository.csproj" />
-</Solution>

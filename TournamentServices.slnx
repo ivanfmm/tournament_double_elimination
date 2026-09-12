@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TournamentServices.Api/TournamentServices.Api.csproj" />
+    <Project Path="src/TournamentServices.Delegates/TournamentServices.Delegates.csproj" />
+    <Project Path="src/TournamentServices.Domain/TournamentServices.Domain.csproj" />
+    <Project Path="src/TournamentServices.Repositories/TournamentServices.Repositories.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TournamentServices.Api.Tests/TournamentServices.Api.Tests.csproj" />
+    <Project Path="tests/TournamentServices.Delegates.Tests/TournamentServices.Delegates.Tests.csproj" />
+    <Project Path="tests/TournamentServices.Domain.Tests/TournamentServices.Domain.Tests.csproj" />
+    <Project Path="tests/TournamentServices.Repositories.Tests/TournamentServices.Repositories.Tests.csproj" />
+  </Folder>
+</Solution>
