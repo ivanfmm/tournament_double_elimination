@@ -1,6 +1,0 @@
-{
-  "TournamentServices.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/workspace\/src\/TournamentServices.Api",
-  "TournamentServices.Delegates, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/workspace\/src\/TournamentServices.Delegates",
-  "TournamentServices.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/workspace\/src\/TournamentServices.Domain",
-  "TournamentServices.Repositories, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/workspace\/src\/TournamentServices.Repositories"
-}
