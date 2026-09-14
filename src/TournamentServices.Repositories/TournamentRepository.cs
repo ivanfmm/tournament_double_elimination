@@ -67,7 +67,13 @@ public class TournamentRepository : ITournamentRepository
             return false;
         }
 
+        var groups = await _context.Groups.Where(g => g.TournamentId == id).ToListAsync();
+        var matches = await _context.Matches.Where(m => m.TournamentId == id).ToListAsync();
+
+        _context.Groups.RemoveRange(groups);
+        _context.Matches.RemoveRange(matches);
         _context.Tournaments.Remove(tournament);
+
         await _context.SaveChangesAsync();
         return true;
     }
