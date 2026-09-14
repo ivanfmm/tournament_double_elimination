@@ -58,9 +58,14 @@ public class TournamentDbContext : DbContext
             b.HasKey(m => m.Id);
             b.Property(m => m.TournamentId).IsRequired();
             b.Property(m => m.GroupId);
-            b.Property(m => m.HomeTeamId).IsRequired();
-            b.Property(m => m.VisitorTeamId).IsRequired();
 
+            b.Property<string>("_homeTeamId")
+                .HasColumnName("HomeTeamId")
+                .IsRequired();
+
+            b.Property<string>("_visitorTeamId")
+                .HasColumnName("VisitorTeamId")
+                .IsRequired();
             // Score es un value object embebido (owned type): sus dos
             // enteros se guardan como columnas normales DENTRO de la
             // misma tabla Matches, no en una tabla separada.
