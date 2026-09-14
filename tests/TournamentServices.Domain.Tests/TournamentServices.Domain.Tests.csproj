@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TournamentServices.Domain\TournamentServices.Domain.csproj" />
+    <ProjectReference Include="..\TournamentServices.TestBuilders\TournamentServices.TestBuilders.csproj" />
   </ItemGroup>
 
 </Project>

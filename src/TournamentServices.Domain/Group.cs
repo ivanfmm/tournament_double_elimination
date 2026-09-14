@@ -4,7 +4,7 @@ namespace TournamentServices.Domain;
 public class Group
 {
     private string _name = string.Empty;
-    private readonly List<string> _teamIds = new();
+    private List<string> _teamIds = new();
 
     public string Id { get; set; } = string.Empty;
     public string TournamentId { get; set; } = string.Empty;
