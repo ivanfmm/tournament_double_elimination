@@ -1,57 +1,63 @@
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TournamentServices.Domain;
-using TournamentServices.Domain.Repositories;
 
-namespace TournamentServices.Repositories
+namespace TournamentServices.Repositories;
+
+public class GroupRepository : IGroupRepository
 {
-    public class GroupRepository : IGroupRepository
+    private readonly TournamentDbContext _context;
+
+    public GroupRepository(TournamentDbContext context)
     {
-        private readonly TournamentDbContext _context;
+        _context = context;
+    }
 
-        public GroupRepository(TournamentDbContext context)
+    // Solo lectura: sin tracking.
+    public async Task<IReadOnlyList<Group>> GetByTournamentAsync(string tournamentId)
+    {
+        return await _context.Groups
+            .AsNoTracking()
+            .Where(g => g.TournamentId == tournamentId)
+            .ToListAsync();
+    }
+
+    // Con tracking: el Delegate modifica esta instancia y luego llama UpdateAsync.
+    public async Task<Group?> GetByIdAsync(string id)
+    {
+        return await _context.Groups.FirstOrDefaultAsync(g => g.Id == id);
+    }
+
+    public async Task AddAsync(Group group)
+    {
+        _context.Groups.Add(group);
+        await _context.SaveChangesAsync();
+    }
+
+    // Update marca todas las columnas como modificadas. Es necesario porque
+    // TeamIds es una lista con conversion a JSON y EF no detecta solo
+    // los cambios hechos dentro de la lista (AddTeam).
+    public async Task UpdateAsync(Group group)
+    {
+        _context.Groups.Update(group);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeleteAsync(string id)
+    {
+        var group = await _context.Groups.FirstOrDefaultAsync(g => g.Id == id);
+        if (group is null)
         {
-            _context = context;
+            return;
         }
 
-        public async Task<IReadOnlyList<Group>> GetByTournamentAsync(string tournamentId)
-        {
-            return await _context.Groups
-                .Where(g => g.TournamentId == tournamentId)
-                .ToListAsync();
-        }
+        _context.Groups.Remove(group);
+        await _context.SaveChangesAsync();
+    }
 
-        public async Task<Group?> GetByIdAsync(string id)
-        {
-            return await _context.Groups.FindAsync(id);
-        }
-
-        public async Task AddAsync(Group group)
-        {
-            await _context.Groups.AddAsync(group);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task UpdateAsync(Group group)
-        {
-            _context.Groups.Update(group);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task DeleteAsync(string id)
-        {
-            var group = await GetByIdAsync(id);
-            if (group != null)
-            {
-                _context.Groups.Remove(group);
-                await _context.SaveChangesAsync();
-            }
-        }
-
-        public async Task<bool> ExistsByNameInTournamentAsync(string name, string tournamentId)
-        {
-            return await _context.Groups
-                .AnyAsync(g => g.Name == name && g.TournamentId == tournamentId);
-        }
+    public async Task<bool> ExistsByNameInTournamentAsync(string tournamentId, string name)
+    {
+        var normalized = name.Trim().ToLower();
+        return await _context.Groups
+            .AnyAsync(g => g.TournamentId == tournamentId && g.Name.ToLower() == normalized);
     }
 }
