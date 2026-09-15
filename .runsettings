@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <TEST_POSTGRES>Host=tournament_db;Port=5432;Username=postgres;Password=password</TEST_POSTGRES>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

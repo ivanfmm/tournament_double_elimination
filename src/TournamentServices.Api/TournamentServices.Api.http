@@ -1,6 +1,155 @@
-@TournamentServices.Api_HostAddress = http://localhost:5075
+@host = http://localhost:5075
 
-GET {{TournamentServices.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Health check
+GET {{host}}/health
+
+##############################################
+# ABC de EQUIPOS
+##############################################
+
+### Alta de equipo
+# @name createTeam
+POST {{host}}/teams
+Content-Type: application/json
+
+{ "name": "Pumas" }
+
+### Guarda el id del equipo recien creado
+@teamId = {{createTeam.response.body.id}}
+
+### Alta de un segundo equipo
+# @name createTeam2
+POST {{host}}/teams
+Content-Type: application/json
+
+{ "name": "Chivas" }
 
 ###
+@teamId2 = {{createTeam2.response.body.id}}
+
+### Listar equipos
+GET {{host}}/teams
+
+### Leer un equipo
+GET {{host}}/teams/{{teamId}}
+
+### Cambio: renombrar equipo
+PUT {{host}}/teams/{{teamId}}
+Content-Type: application/json
+
+{ "name": "Pumas UNAM" }
+
+### Nombre duplicado -> 400
+POST {{host}}/teams
+Content-Type: application/json
+
+{ "name": "Chivas" }
+
+### Id con formato invalido -> 400
+GET {{host}}/teams/id_invalido
+
+##############################################
+# ABC de TORNEOS
+##############################################
+
+### Alta de torneo
+# @name createTournament
+POST {{host}}/tournaments
+Content-Type: application/json
+
+{
+  "name": "Copa Cetys",
+  "format": {
+    "maxTeamsPerGroup": 4,
+    "numberOfGroups": 2,
+    "type": "ROUND_ROBIN"
+  }
+}
+
+###
+@tournamentId = {{createTournament.response.body.id}}
+
+### Listar torneos
+GET {{host}}/tournaments
+
+### Leer torneo (trae grupos y partidos)
+GET {{host}}/tournaments/{{tournamentId}}
+
+### Cambio total (PUT)
+PUT {{host}}/tournaments/{{tournamentId}}
+Content-Type: application/json
+
+{
+  "name": "Copa Cetys 2026",
+  "format": {
+    "maxTeamsPerGroup": 8,
+    "numberOfGroups": 4,
+    "type": "NFL"
+  }
+}
+
+### Cambio parcial (PATCH) - solo el nombre, el formato se conserva
+PATCH {{host}}/tournaments/{{tournamentId}}
+Content-Type: application/json
+
+{ "name": "Copa Final" }
+
+### Cambio parcial (PATCH) - solo un campo del formato
+PATCH {{host}}/tournaments/{{tournamentId}}
+Content-Type: application/json
+
+{ "format": { "type": "DOUBLE_ELIMINATION" } }
+
+##############################################
+# ABC de GRUPOS
+##############################################
+
+### Alta de grupo
+# @name createGroup
+POST {{host}}/tournaments/{{tournamentId}}/groups
+Content-Type: application/json
+
+{ "name": "Grupo A" }
+
+###
+@groupId = {{createGroup.response.body.id}}
+
+### Listar grupos del torneo
+GET {{host}}/tournaments/{{tournamentId}}/groups
+
+### Leer un grupo
+GET {{host}}/tournaments/{{tournamentId}}/groups/{{groupId}}
+
+### Asignar equipos al grupo -> 204
+PATCH {{host}}/tournaments/{{tournamentId}}/groups/{{groupId}}/teams
+Content-Type: application/json
+
+{ "teamIds": ["{{teamId}}", "{{teamId2}}"] }
+
+### Cambio: renombrar grupo
+PUT {{host}}/tournaments/{{tournamentId}}/groups/{{groupId}}
+Content-Type: application/json
+
+{ "name": "Grupo Z" }
+
+### Nombre de grupo repetido -> 422
+POST {{host}}/tournaments/{{tournamentId}}/groups
+Content-Type: application/json
+
+{ "name": "grupo z" }
+
+##############################################
+# BAJAS (correr al final)
+##############################################
+
+### Baja de grupo
+DELETE {{host}}/tournaments/{{tournamentId}}/groups/{{groupId}}
+
+### Baja de torneo (borra grupos y partidos en cascada)
+DELETE {{host}}/tournaments/{{tournamentId}}
+
+### Baja de equipos
+DELETE {{host}}/teams/{{teamId}}
+
+###
+DELETE {{host}}/teams/{{teamId2}}
