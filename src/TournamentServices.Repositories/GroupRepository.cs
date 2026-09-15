@@ -14,10 +14,11 @@ namespace TournamentServices.Repositories
             _context = context;
         }
 
-        public async Task<Group?> GetByTournamentAsync(string tournamentId)
+        public async Task<IReadOnlyList<Group>> GetByTournamentAsync(string tournamentId)
         {
             return await _context.Groups
-                .FirstOrDefaultAsync(g => g.TournamentId == tournamentId);
+                .Where(g => g.TournamentId == tournamentId)
+                .ToListAsync();
         }
 
         public async Task<Group?> GetByIdAsync(string id)
