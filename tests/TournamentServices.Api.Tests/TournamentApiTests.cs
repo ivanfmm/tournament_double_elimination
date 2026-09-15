@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -8,10 +10,16 @@ using TournamentServices.Repositories;
 namespace TournamentServices.Api.Tests;
 
 // Clase base para los *RoutesTests. Cada test (xUnit crea una instancia
-// por test) levanta su propia API con su propia base InMemory, asi los
-// tests son aislados y pueden correr en paralelo.
+// por test) levanta su propia API con su propia base, asi los tests son
+// aislados y pueden correr en paralelo.
 public abstract class TournamentApiTests : IDisposable
 {
+    // Mismas reglas de JSON que la API (enums como ROUND_ROBIN, HOME...).
+    protected static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper) }
+    };
+
     protected readonly WebApplicationFactory<Program> Factory;
     protected readonly HttpClient Client;
 
@@ -23,9 +31,8 @@ public abstract class TournamentApiTests : IDisposable
         {
             builder.ConfigureTestServices(services =>
             {
-                // Se quita el registro de Program.cs (nombre fijo) y se
-                // registra otro con nombre unico. En EF Core 9+ tambien hay
-                // que quitar IDbContextOptionsConfiguration.
+                // Se quita el registro de Program.cs y se registra otro.
+                // En EF Core 9+ tambien hay que quitar IDbContextOptionsConfiguration.
                 var toRemove = services
                     .Where(d => d.ServiceType == typeof(DbContextOptions<TournamentDbContext>)
                              || d.ServiceType.Name.StartsWith("IDbContextOptionsConfiguration"))
@@ -36,16 +43,21 @@ public abstract class TournamentApiTests : IDisposable
                     services.Remove(descriptor);
                 }
 
-                // Cada test crea su propia API, y EF lanza un error cuando se
-                // crean mas de 20 service providers internos. En tests es
-                // esperado, por eso se ignora esa advertencia.
-                services.AddDbContext<TournamentDbContext>(options => options
-                    .UseInMemoryDatabase(databaseName)
-                    .ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning)));
+                services.AddDbContext<TournamentDbContext>(options => ConfigureDatabase(options, databaseName));
             });
         });
 
         Client = Factory.CreateClient();
+    }
+
+    // Por default: InMemory con nombre unico. Las pruebas de Postgres lo sobreescriben.
+    // Cada test crea su propia API y EF avisa (como error) cuando se crean mas de
+    // 20 service providers internos. En tests es esperado, por eso se ignora.
+    protected virtual void ConfigureDatabase(DbContextOptionsBuilder options, string databaseName)
+    {
+        options
+            .UseInMemoryDatabase(databaseName)
+            .ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
     }
 
     // Inserta datos directo en la base, sin pasar por la API.
@@ -65,7 +77,7 @@ public abstract class TournamentApiTests : IDisposable
         return await query(db);
     }
 
-    public void Dispose()
+    public virtual void Dispose()
     {
         Client.Dispose();
         Factory.Dispose();
