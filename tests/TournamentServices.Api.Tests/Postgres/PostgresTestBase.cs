@@ -11,8 +11,12 @@ namespace TournamentServices.Api.Tests.Postgres;
 // TEST_POSTGRES con una connection string. Si no existe, el test
 // aparece como "Skipped" en vez de fallar.
 //
-//   PowerShell:  $env:TEST_POSTGRES="Host=localhost;Port=5432;Username=postgres;Password=password"
 //   bash:        export TEST_POSTGRES="Host=localhost;Port=5432;Username=postgres;Password=password"
+//   PowerShell:  $env:TEST_POSTGRES="Host=localhost;Port=5432;Username=postgres;Password=password"
+//
+// Ojo: TEST_POSTGRES NO es lo mismo que ConnectionStrings__Default (la que
+// usa la API). Esta apunta al SERVIDOR, no a una base: el nombre de la base
+// lo pone ConfigureDatabase abajo, una distinta por cada test.
 public sealed class PostgresFactAttribute : FactAttribute
 {
     public const string VariableName = "TEST_POSTGRES";
@@ -49,12 +53,18 @@ public sealed class PostgresTheoryAttribute : TheoryAttribute
 // "tournament" que usa la API de desarrollo.
 public abstract class PostgresTestBase : TournamentApiTests
 {
+    // Toda base creada por estas pruebas empieza con este prefijo, y es
+    // lo unico que Dispose tiene permitido borrar. Ver EnsureSafeToDelete.
+    private const string TestDatabasePrefix = "tournament_test_";
+
     protected override void ConfigureDatabase(DbContextOptionsBuilder options, string databaseName)
     {
+        // Se toma el servidor de TEST_POSTGRES pero se IGNORA cualquier
+        // Database= que traiga: cada test manda sobre su propia base.
         var connection = new NpgsqlConnectionStringBuilder(
             Environment.GetEnvironmentVariable(PostgresFactAttribute.VariableName))
         {
-            Database = $"tournament_test_{databaseName.Replace("-", "")[..12]}"
+            Database = $"{TestDatabasePrefix}{databaseName.Replace("-", "")[..12]}"
         };
 
         options.UseNpgsql(connection.ConnectionString);
@@ -90,9 +100,33 @@ public abstract class PostgresTestBase : TournamentApiTests
         if (PostgresFactAttribute.IsEnabled)
         {
             using var scope = Factory.Services.CreateScope();
-            scope.ServiceProvider.GetRequiredService<TournamentDbContext>().Database.EnsureDeleted();
+            var db = scope.ServiceProvider.GetRequiredService<TournamentDbContext>();
+
+            EnsureSafeToDelete(db);
+            db.Database.EnsureDeleted();
         }
 
         base.Dispose();
+    }
+
+    // RED DE SEGURIDAD. EnsureDeleted() borra la base COMPLETA, sin
+    // preguntar y sin vuelta atras. Aqui no se confia en lo que
+    // ConfigureDatabase *intento* configurar: se lee el nombre real de la
+    // base a la que el contexto va a mandar el DROP, y se compara contra
+    // el prefijo. Si alguien rompe ConfigureDatabase, o apunta las pruebas
+    // a la base de desarrollo, esto truena ANTES del borrado en vez de
+    // dejarte sin datos.
+    private static void EnsureSafeToDelete(TournamentDbContext db)
+    {
+        var target = db.Database.GetDbConnection().Database;
+
+        if (!target.StartsWith(TestDatabasePrefix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"ABORTADO: las pruebas intentaron borrar la base '{target}', que no es una base de prueba. " +
+                $"Solo se pueden borrar bases cuyo nombre empiece con '{TestDatabasePrefix}'. " +
+                $"Revisa {nameof(PostgresTestBase)}.{nameof(ConfigureDatabase)} y la variable " +
+                $"{PostgresFactAttribute.VariableName}.");
+        }
     }
 }

@@ -5,46 +5,117 @@ La carpeta `tournament_routes_postgres/` ya no se usa y se puede borrar.
 
 ---
 
-## 1. Levantar Postgres
+## 0. Dónde estás parado importa
 
-```bash
-docker compose up -d tournament_db      # o: podman compose up -d tournament_db
-```
+Hay **dos formas** de correr esto, y la connection string cambia según cuál uses:
 
-Deja la base `tournament` escuchando en `localhost:5432` con
-usuario `postgres` / contraseña `password`.
+| Dónde corres `dotnet` | Host de Postgres | Puerto de la API |
+|---|---|---|
+| Dentro del dev container (`tournament_api_dev`) — lo normal | `tournament_db` | `8080` dentro, `8081` desde Fedora |
+| En Fedora/Windows directo, sin contenedor | `localhost` | `5075` |
 
-> Nota: `database/init/db_script.sql` crea *otra* base (`tournament_db`) con
-> tablas tipo documento (JSONB). La API **no** usa esas tablas: EF Core crea
-> su propio esquema relacional (`Teams`, `Groups`, `Matches`, `Tournaments`)
-> dentro de la base `tournament` la primera vez que arranca
-> (`EnsureCreated()` en `Program.cs`). Si algún día cambian el modelo de
-> dominio, hay que borrar la base o pasar a migraciones de EF — `EnsureCreated`
-> no altera tablas que ya existen.
+Dentro del dev container **no tienes que configurar nada**: el
+`docker-compose.dev.yml` ya define la variable de entorno
+`ConnectionStrings__Default: Host=tournament_db;...`, y esa variable
+**gana** sobre `appsettings.Development.json`. Por eso ese archivo dice
+`localhost` y aun así funciona dentro del contenedor.
 
 ---
 
-## 2. Correr la API
+## 1. Fedora con Podman — levantar todo
 
 ```bash
-dotnet run --project src/TournamentServices.Api
+cd ~/tu-proyecto/tournament_double_elimination
+git pull
+
+podman compose -f docker-compose.dev.yml up -d
+podman ps        # deben aparecer tournament_db y tournament_api_dev
 ```
 
-- Con `ASPNETCORE_ENVIRONMENT=Development` (lo que hace `dotnet run` por
-  default gracias a `launchSettings.json`) lee la connection string de
-  `appsettings.Development.json` → **Postgres**.
-- Si no hay connection string, cae a **InMemory** y la API arranca igual.
-  Útil para probar rutas sin tener Postgres encendido.
+Si `podman compose` no existe:
 
-Para probar a mano: `src/TournamentServices.Api/TournamentServices.Api.http`
-ya trae el ABC completo de equipos, torneos y grupos, encadenando los ids
-entre requests.
+```bash
+sudo dnf install -y podman-compose
+podman-compose -f docker-compose.dev.yml up -d
+```
+
+El `:Z` de los volúmenes ya está puesto en el compose, así que SELinux no
+te va a bloquear el bind mount.
+
+**Si el puerto 5432 está ocupado** (Postgres instalado en Fedora):
+
+```bash
+sudo ss -tlnp | grep 5432
+sudo systemctl stop postgresql     # o cambia el puerto en el compose
+```
 
 ---
 
-## 3. Correr las pruebas
+## 2. Trabajar dentro del contenedor
 
-### 3.1 Todo lo que no necesita Postgres
+En VS Code: `Ctrl+Shift+P` → *Dev Containers: Reopen in Container*.
+
+O sin VS Code:
+
+```bash
+podman exec -it tournament_api_dev bash
+cd /workspace
+```
+
+Ya adentro:
+
+```bash
+dotnet restore     # necesario: se agregó el paquete Npgsql a Api.Tests
+dotnet build
+```
+
+Levantar la API:
+
+```bash
+dotnet watch run --project src/TournamentServices.Api
+```
+
+Y desde Fedora, en otra terminal:
+
+```bash
+curl http://localhost:8081/health          # -> "Services running"
+```
+
+> El código está bind-mounteado (`.:/workspace`), así que **editar un
+> `.cs` no requiere reconstruir la imagen**. Solo `dotnet restore` cuando
+> cambie un `.csproj`.
+
+---
+
+## 3. Comprobar que Postgres realmente está conectado
+
+```bash
+podman exec -it tournament_db psql -U postgres -d tournament -c "\dt"
+```
+
+Deberías ver `Teams`, `Groups`, `Matches`, `Tournaments`. Esas tablas las
+crea EF Core con `EnsureCreated()` la primera vez que arranca la API.
+
+> `database/init/db_script.sql` crea *otra* base (`tournament_db`) con
+> tablas tipo documento (JSONB). La API **no** usa esas tablas. Son dos
+> esquemas distintos que no chocan porque viven en bases separadas.
+
+**Si cambian el modelo de dominio**, `EnsureCreated` no altera tablas que
+ya existen. Hay que borrar el volumen:
+
+```bash
+podman compose -f docker-compose.dev.yml down
+podman volume rm tournament_pgdata
+podman compose -f docker-compose.dev.yml up -d
+```
+
+---
+
+## 4. Correr las pruebas
+
+### 4.1 Todo lo que no necesita Postgres
+
+Dentro del contenedor:
 
 ```bash
 dotnet test
@@ -53,35 +124,35 @@ dotnet test
 Corre Domain, Repositories, Delegates y las rutas con EF Core **InMemory**.
 Las pruebas de `Api.Tests/Postgres/` aparecen como **Skipped**.
 
-### 3.2 Incluyendo las pruebas contra Postgres real
+### 4.2 Incluyendo las pruebas contra Postgres real
 
-Define `TEST_POSTGRES` y vuelve a correr:
+Define `TEST_POSTGRES`. **Ojo con el host** — dentro del contenedor es
+`tournament_db`, no `localhost`:
 
-**PowerShell (Windows)**
-```powershell
-$env:TEST_POSTGRES = "Host=localhost;Port=5432;Username=postgres;Password=password"
+```bash
+export TEST_POSTGRES="Host=tournament_db;Port=5432;Username=postgres;Password=password"
 dotnet test
 ```
 
-**bash**
+Si corres `dotnet` fuera del contenedor (en Fedora directo):
+
 ```bash
 export TEST_POSTGRES="Host=localhost;Port=5432;Username=postgres;Password=password"
-dotnet test
 ```
 
-Cada test crea su propia base `tournament_test_xxxxxxxxxxxx`, corre contra
-ella y la borra al terminar. Nunca tocan la base `tournament` de desarrollo,
-y por eso pueden correr en paralelo.
-
-Para correr solo el ABC de Postgres:
+Solo el ABC contra Postgres:
 
 ```bash
 dotnet test --filter "FullyQualifiedName~TournamentServices.Api.Tests.Postgres"
 ```
 
+Cada test crea su propia base `tournament_test_xxxxxxxxxxxx`, corre contra
+ella y la borra al terminar. Nunca tocan la base `tournament` de
+desarrollo, y por eso pueden correr en paralelo.
+
 ---
 
-## 4. Qué cubre cada archivo de prueba
+## 5. Qué cubre cada archivo de prueba
 
 | Archivo | Qué prueba |
 |---|---|
@@ -94,7 +165,21 @@ dotnet test --filter "FullyQualifiedName~TournamentServices.Api.Tests.Postgres"
 
 ---
 
-## 5. Códigos de estado (referencia rápida)
+## 6. Probar a mano
+
+`src/TournamentServices.Api/TournamentServices.Api.http` trae el ABC
+completo encadenando ids entre requests. Cambia la primera línea según
+dónde corras:
+
+```
+@host = http://localhost:8081      # API en el dev container, visto desde Fedora
+@host = http://localhost:8080      # desde adentro del dev container
+@host = http://localhost:5075      # dotnet run fuera de contenedor
+```
+
+---
+
+## 7. Códigos de estado (referencia rápida)
 
 | Código | Cuándo |
 |---|---|
