@@ -47,7 +47,7 @@ public abstract class TournamentApiTests : IDisposable
             });
         });
 
-        Client = Factory.CreateClient();
+        Client = Factory.CreateClient();  
     }
 
     // Por default: InMemory con nombre unico. Las pruebas de Postgres lo sobreescriben.
