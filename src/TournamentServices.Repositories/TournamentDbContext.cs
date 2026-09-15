@@ -40,6 +40,10 @@ public class TournamentDbContext : DbContext
             b.Property(g => g.Name).IsRequired();
             b.Property(g => g.TournamentId).IsRequired();
 
+            // TeamIds es la vista de solo lectura de _teamIds. Se ignora para
+            // que EF no intente mapear la misma lista dos veces.
+            b.Ignore(g => g.TeamIds);
+
             b.Property<List<string>>("_teamIds")
                 .HasColumnName("TeamIds")
                 .HasConversion(
