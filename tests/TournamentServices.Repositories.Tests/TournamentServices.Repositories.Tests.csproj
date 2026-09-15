@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TournamentServices.Repositories\TournamentServices.Repositories.csproj" />
+    <ProjectReference Include="..\TournamentServices.TestBuilders\TournamentServices.TestBuilders.csproj" />
   </ItemGroup>
 
 </Project>
