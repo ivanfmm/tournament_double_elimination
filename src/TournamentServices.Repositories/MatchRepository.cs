@@ -5,18 +5,16 @@ namespace TournamentServices.Repositories;
 
 public class MatchRepository : IMatchRepository
 {
-    private readonly TournamentDbContext _db;
+    private readonly TournamentDbContext _context;
 
-    public MatchRepository(TournamentDbContext db)
+    public MatchRepository(TournamentDbContext context)
     {
-        _db = db;
+        _context = context;
     }
 
-    // AsNoTracking porque es una lectura de solo consulta: nadie va a
-    // modificar estas entidades, y sin tracking la consulta es mas barata.
     public async Task<IReadOnlyList<Match>> GetByTournamentAsync(string tournamentId)
     {
-        return await _db.Matches
+        return await _context.Matches
             .AsNoTracking()
             .Where(m => m.TournamentId == tournamentId)
             .ToListAsync();
@@ -26,30 +24,30 @@ public class MatchRepository : IMatchRepository
     // y luego llama UpdateAsync sobre esa misma instancia.
     public async Task<Match?> GetByIdAsync(string id)
     {
-        return await _db.Matches.FirstOrDefaultAsync(m => m.Id == id);
+        return await _context.Matches.FirstOrDefaultAsync(m => m.Id == id);
     }
 
     public async Task AddAsync(Match match)
     {
-        _db.Matches.Add(match);
-        await _db.SaveChangesAsync();
+        _context.Matches.Add(match);
+        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(Match match)
     {
-        _db.Matches.Update(match);
-        await _db.SaveChangesAsync();
+        _context.Matches.Update(match);
+        await _context.SaveChangesAsync();
     }
 
     public async Task DeleteAsync(string id)
     {
-        var match = await _db.Matches.FirstOrDefaultAsync(m => m.Id == id);
+        var match = await _context.Matches.FirstOrDefaultAsync(m => m.Id == id);
         if (match is null)
         {
             return;
         }
 
-        _db.Matches.Remove(match);
-        await _db.SaveChangesAsync();
+        _context.Matches.Remove(match);
+        await _context.SaveChangesAsync();
     }
 }

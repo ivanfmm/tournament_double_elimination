@@ -10,10 +10,7 @@ public class MatchDelegate : IMatchDelegate
     private readonly ITeamRepository _teamRepository;
     private readonly IGroupRepository _groupRepository;
 
-    public MatchDelegate(
-        IMatchRepository matchRepository,
-        ITeamRepository teamRepository,
-        IGroupRepository groupRepository)
+    public MatchDelegate(IMatchRepository matchRepository, ITeamRepository teamRepository, IGroupRepository groupRepository)
     {
         _matchRepository = matchRepository;
         _teamRepository = teamRepository;
@@ -30,11 +27,7 @@ public class MatchDelegate : IMatchDelegate
         return _matchRepository.GetByIdAsync(id);
     }
 
-    public async Task<Match> CreateAsync(
-        string tournamentId,
-        string homeTeamId,
-        string visitorTeamId,
-        string? groupId = null)
+    public async Task<Match> CreateAsync(string tournamentId, string homeTeamId, string visitorTeamId, string? groupId = null)
     {
         await EnsureTeamExistsAsync(homeTeamId);
         await EnsureTeamExistsAsync(visitorTeamId);
@@ -108,11 +101,7 @@ public class MatchDelegate : IMatchDelegate
         }
     }
 
-    private static void EnsureTeamsShareGroup(
-        IReadOnlyList<Group> groups,
-        string groupId,
-        string homeTeamId,
-        string visitorTeamId)
+    private static void EnsureTeamsShareGroup(IReadOnlyList<Group> groups, string groupId, string homeTeamId, string visitorTeamId)
     {
         var group = groups.FirstOrDefault(g => g.Id == groupId);
         if (group is null)

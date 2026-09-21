@@ -10,10 +10,7 @@ public class GroupDelegate : IGroupDelegate
     private readonly ITournamentRepository _tournamentRepository;
     private readonly ITeamRepository _teamRepository;
 
-    public GroupDelegate(
-        IGroupRepository groupRepository,
-        ITournamentRepository tournamentRepository,
-        ITeamRepository teamRepository)
+    public GroupDelegate(IGroupRepository groupRepository, ITournamentRepository tournamentRepository, ITeamRepository teamRepository)
     {
         _groupRepository = groupRepository;
         _tournamentRepository = tournamentRepository;

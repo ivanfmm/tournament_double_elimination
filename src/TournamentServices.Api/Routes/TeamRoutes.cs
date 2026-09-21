@@ -42,10 +42,7 @@ public static class TeamRoutes
         return Results.Ok(team.ToDto());
     }
 
-    private static async Task<IResult> CreateAsync(
-        CreateTeamDto dto,
-        IValidator<CreateTeamDto> validator,
-        ITeamDelegate teamDelegate)
+    private static async Task<IResult> CreateAsync(CreateTeamDto dto, IValidator<CreateTeamDto> validator, ITeamDelegate teamDelegate)
     {
         var validation = await validator.ValidateAsync(dto);
         if (!validation.IsValid)
@@ -65,11 +62,7 @@ public static class TeamRoutes
         }
     }
 
-    private static async Task<IResult> UpdateAsync(
-        string teamId,
-        UpdateTeamDto dto,
-        IValidator<UpdateTeamDto> validator,
-        ITeamDelegate teamDelegate)
+    private static async Task<IResult> UpdateAsync(string teamId, UpdateTeamDto dto, IValidator<UpdateTeamDto> validator, ITeamDelegate teamDelegate)
     {
         var invalidId = IdFormat.Validate(("teamId", teamId));
         if (invalidId is not null)

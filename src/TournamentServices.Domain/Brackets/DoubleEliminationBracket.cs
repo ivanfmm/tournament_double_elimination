@@ -5,7 +5,7 @@ namespace TournamentServices.Domain.Brackets;
 
 public class DoubleEliminationBracket
 {
-    private enum Origin { Winners, Losers, GrandFinal, GrandFinalReset }
+    private BracketSide Origin;
 
     private readonly string _tournamentId;
     private readonly int _rounds;
@@ -28,7 +28,7 @@ public class DoubleEliminationBracket
     // --- Gran final ---
     private string? _grandFinalMatchId;
 
-    private readonly Dictionary<string, (Origin Origin, int Level, int Index)> _matchDestinations = new();
+    private readonly Dictionary<string, (BracketSide Origin, int Level, int Index)> _matchDestinations = new();
     private readonly Dictionary<string, Match> _matchesById = new();
     private readonly List<Match> _pendingMatches = new();
 
@@ -141,7 +141,7 @@ public class DoubleEliminationBracket
         var match = new Match(matchId, _tournamentId, homeTeamId, visitorTeamId);
 
         _matchesById[matchId] = match;
-        _matchDestinations[matchId] = (Origin.Winners, level, index);
+        _matchDestinations[matchId] = (BracketSide.Winners, level, index);
         _pendingMatches.Add(match);
     }
 
@@ -253,7 +253,7 @@ public class DoubleEliminationBracket
             var match = new Match(matchId, _tournamentId, home, visitor);
 
             _matchesById[matchId] = match;
-            _matchDestinations[matchId] = (Origin.Losers, 0, i);
+            _matchDestinations[matchId] = (BracketSide.Losers, 0, i);
             _pendingMatches.Add(match);
         }
 
@@ -300,7 +300,7 @@ public class DoubleEliminationBracket
         var match = new Match(_grandFinalMatchId, _tournamentId, _winnersChampion, _losersChampion);
 
         _matchesById[_grandFinalMatchId] = match;
-        _matchDestinations[_grandFinalMatchId] = (Origin.GrandFinal, 0, 0);
+        _matchDestinations[_grandFinalMatchId] = (BracketSide.GrandFinal, 0, 0);
         _pendingMatches.Add(match);
     }
 
@@ -323,12 +323,12 @@ public class DoubleEliminationBracket
 
         switch (origin)
         {
-            case Origin.Winners:
+            case BracketSide.Winners:
                 AdvanceWinnerBracketWinner(level + 1, index, winnerTeamId);
                 AddWbLoser(level + 1, loserTeamId);
                 break;
 
-            case Origin.Losers:
+            case BracketSide.Losers:
                 _lbPendingSurvivorsBuffer![index] = winnerTeamId;
                 if (Array.TrueForAll(_lbPendingSurvivorsBuffer, v => v is not null))
                 {
@@ -336,7 +336,7 @@ public class DoubleEliminationBracket
                 }
                 break;
 
-            case Origin.GrandFinal:
+            case BracketSide.GrandFinal:
                 if (winnerTeamId == _winnersChampion)
                 {
                     IsCompleted = true;
@@ -347,12 +347,12 @@ public class DoubleEliminationBracket
                     var resetId = "grand-final-reset";
                     var resetMatch = new Match(resetId, _tournamentId, winnerTeamId, loserTeamId);
                     _matchesById[resetId] = resetMatch;
-                    _matchDestinations[resetId] = (Origin.GrandFinalReset, 0, 0);
+                    _matchDestinations[resetId] = (BracketSide.GrandFinalReset, 0, 0);
                     _pendingMatches.Add(resetMatch);
                 }
                 break;
 
-            case Origin.GrandFinalReset:
+            case BracketSide.GrandFinalReset:
                 IsCompleted = true;
                 ChampionTeamId = winnerTeamId;
                 break;

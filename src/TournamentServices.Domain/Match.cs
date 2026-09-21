@@ -9,7 +9,7 @@ public class Match
     public string Id { get; set; } = string.Empty;
     public string TournamentId { get; set; } = string.Empty;
     public string? GroupId { get; set; }
-
+    
     public string HomeTeamId
     {
         get => _homeTeamId;

@@ -23,10 +23,7 @@ public static class GroupRoutes
         return app;
     }
 
-    private static async Task<IResult> GetByTournamentAsync(
-        string tournamentId,
-        IGroupDelegate groupDelegate,
-        ITeamDelegate teamDelegate)
+    private static async Task<IResult> GetByTournamentAsync(string tournamentId, IGroupDelegate groupDelegate, ITeamDelegate teamDelegate)
     {
         var invalidId = IdFormat.Validate(("tournamentId", tournamentId));
         if (invalidId is not null)
@@ -40,11 +37,7 @@ public static class GroupRoutes
         return Results.Ok(groups.Select(g => g.ToDto(teams)));
     }
 
-    private static async Task<IResult> GetByIdAsync(
-        string tournamentId,
-        string groupId,
-        IGroupDelegate groupDelegate,
-        ITeamDelegate teamDelegate)
+    private static async Task<IResult> GetByIdAsync(string tournamentId, string groupId, IGroupDelegate groupDelegate, ITeamDelegate teamDelegate)
     {
         var invalidId = IdFormat.Validate(("tournamentId", tournamentId), ("groupId", groupId));
         if (invalidId is not null)
@@ -59,11 +52,7 @@ public static class GroupRoutes
         return Results.Ok(group.ToDto(teams));
     }
 
-    private static async Task<IResult> CreateAsync(
-        string tournamentId,
-        CreateGroupDto dto,
-        IValidator<CreateGroupDto> validator,
-        IGroupDelegate groupDelegate)
+    private static async Task<IResult> CreateAsync(string tournamentId, CreateGroupDto dto, IValidator<CreateGroupDto> validator, IGroupDelegate groupDelegate)
     {
         var invalidId = IdFormat.Validate(("tournamentId", tournamentId));
         if (invalidId is not null)
@@ -84,13 +73,7 @@ public static class GroupRoutes
         return Results.Created($"/tournaments/{tournamentId}/groups/{group.Id}", body);
     }
 
-    private static async Task<IResult> UpdateAsync(
-        string tournamentId,
-        string groupId,
-        UpdateGroupDto dto,
-        IValidator<UpdateGroupDto> validator,
-        IGroupDelegate groupDelegate,
-        ITeamDelegate teamDelegate)
+    private static async Task<IResult> UpdateAsync(string tournamentId, string groupId, UpdateGroupDto dto, IValidator<UpdateGroupDto> validator, IGroupDelegate groupDelegate, ITeamDelegate teamDelegate)
     {
         var invalidId = IdFormat.Validate(("tournamentId", tournamentId), ("groupId", groupId));
         if (invalidId is not null)
@@ -109,10 +92,7 @@ public static class GroupRoutes
         return Results.Ok(group.ToDto(teams));
     }
 
-    private static async Task<IResult> DeleteAsync(
-        string tournamentId,
-        string groupId,
-        IGroupDelegate groupDelegate)
+    private static async Task<IResult> DeleteAsync(string tournamentId, string groupId, IGroupDelegate groupDelegate)
     {
         var invalidId = IdFormat.Validate(("tournamentId", tournamentId), ("groupId", groupId));
         if (invalidId is not null)
@@ -124,12 +104,7 @@ public static class GroupRoutes
         return Results.NoContent();
     }
 
-    private static async Task<IResult> AssignTeamsAsync(
-        string tournamentId,
-        string groupId,
-        AssignTeamsDto dto,
-        IValidator<AssignTeamsDto> validator,
-        IGroupDelegate groupDelegate)
+    private static async Task<IResult> AssignTeamsAsync(string tournamentId, string groupId, AssignTeamsDto dto, IValidator<AssignTeamsDto> validator, IGroupDelegate groupDelegate)
     {
         var invalidId = IdFormat.Validate(("tournamentId", tournamentId), ("groupId", groupId));
         if (invalidId is not null)

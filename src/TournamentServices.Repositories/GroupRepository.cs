@@ -12,7 +12,6 @@ public class GroupRepository : IGroupRepository
         _context = context;
     }
 
-    // Solo lectura: sin tracking.
     public async Task<IReadOnlyList<Group>> GetByTournamentAsync(string tournamentId)
     {
         return await _context.Groups
@@ -21,7 +20,6 @@ public class GroupRepository : IGroupRepository
             .ToListAsync();
     }
 
-    // Con tracking: el Delegate modifica esta instancia y luego llama UpdateAsync.
     public async Task<Group?> GetByIdAsync(string id)
     {
         return await _context.Groups.FirstOrDefaultAsync(g => g.Id == id);
@@ -33,9 +31,6 @@ public class GroupRepository : IGroupRepository
         await _context.SaveChangesAsync();
     }
 
-    // Update marca todas las columnas como modificadas. Es necesario porque
-    // TeamIds es una lista con conversion a JSON y EF no detecta solo
-    // los cambios hechos dentro de la lista (AddTeam).
     public async Task UpdateAsync(Group group)
     {
         _context.Groups.Update(group);
