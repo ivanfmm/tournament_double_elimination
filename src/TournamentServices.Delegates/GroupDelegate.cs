@@ -142,9 +142,7 @@ public class GroupDelegate : IGroupDelegate
             throw new DomainValidationException($"El equipo '{teamId}' no existe.");
         }
     }
-
-    // Team no guarda su torneo: un equipo "esta en el torneo" si aparece
-    // en algun grupo del torneo (mismo criterio que MatchDelegate).
+    
     private static void EnsureTeamIsNotAssigned(Tournament tournament, string teamId)
     {
         if (tournament.Groups.Any(g => g.TeamIds.Contains(teamId)))
