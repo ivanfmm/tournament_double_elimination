@@ -70,5 +70,44 @@ pipeline {
                 echo "Build #${env.BUILD_NUMBER} -> release image: ${env.IMAGE}"
             }
         }
+
+        stage('Package Image') {
+            steps {
+                // Sin --no-build: la imagen necesita un build para linux-x64 y el
+                // stage Build compilo sin RID (otra carpeta en bin/), asi que
+                // --no-build no encontraria los binarios. Es el mismo commit
+                // que ya paso las pruebas.
+                // ContainerArchiveOutputPath: el SDK escribe un .tar en vez de
+                // buscar un docker daemon, y podman lo carga por el socket.
+                sh '''
+                    rm -rf out
+                    mkdir -p out
+
+                    dotnet publish src/TournamentServices.Api \
+                        --configuration "$CONFIGURATION" \
+                        --os linux \
+                        --arch x64 \
+                        -p:PublishProfile=DefaultContainer \
+                        -p:ContainerRepository="$IMAGE_NAME" \
+                        -p:ContainerImageTag="$IMAGE_TAG" \
+                        -p:ContainerArchiveOutputPath="$WORKSPACE/out/$IMAGE_NAME.tar"
+
+                    podman load --input "out/$IMAGE_NAME.tar"
+                    podman tag "$IMAGE_NAME:$IMAGE_TAG" "$IMAGE"
+                '''
+            }
+        }
+
+        stage('Publish Image') {
+            steps {
+                // registry local sin TLS. Ojo: podman corre en el host (socket),
+                // por eso localhost:5000 si llega al registry; un curl desde
+                // este contenedor a localhost NO llegaria
+                sh '''
+                    podman push --tls-verify=false "$IMAGE"
+                    podman image inspect "$IMAGE" --format 'Publicada {{.Id}}'
+                '''
+            }
+        }
     }
 }
