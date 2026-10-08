@@ -1,0 +1,4 @@
+# Los scripts corren en Linux (agentes de Jenkins). Si Git en Windows
+# los convierte a CRLF, bash falla con "$'\r': command not found".
+*.sh text eol=lf
+Jenkinsfile text eol=lf

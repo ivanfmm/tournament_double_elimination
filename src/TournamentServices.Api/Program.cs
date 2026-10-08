@@ -72,6 +72,15 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated();
 }
 
+// Modo migracion (Job de Kubernetes): la imagen se corre con el argumento
+// "migrate". El bloque de arriba ya creo la base y las tablas; aqui solo
+// se termina el proceso sin levantar el servidor web.
+if (args.Contains("migrate"))
+{
+    Console.WriteLine("Migracion completada: base y tablas listas.");
+    return;
+}
+
 // Va primero para atrapar las excepciones de todo lo que sigue.
 app.UseMiddleware<ErrorHandlingMiddleware>();
 

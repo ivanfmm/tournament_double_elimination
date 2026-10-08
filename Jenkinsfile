@@ -1,4 +1,5 @@
-// Actividad 4: identidad inmutable del artefacto (tag = commit)
+// Actividad 6: despliegue automatico a dev (kind-dev)
+// Build/test/imagen en build-agent; el despliegue en deploy-agent.
 pipeline {
     agent {
         label 'build-agent'
@@ -106,6 +107,23 @@ pipeline {
                 sh '''
                     podman push --tls-verify=false "$IMAGE"
                     podman image inspect "$IMAGE" --format 'Publicada {{.Id}}'
+                '''
+            }
+        }
+
+        stage('Deploy Dev') {
+            agent {
+                label 'deploy-agent'
+            }
+            steps {
+                // otro contenedor = otro workspace: hay que traer el mismo
+                // commit para tener scripts/ y k8s/ de esa version
+                checkout scm
+                sh '''
+                    ./scripts/deploy.sh \
+                        kind-dev \
+                        dev \
+                        "$IMAGE"
                 '''
             }
         }

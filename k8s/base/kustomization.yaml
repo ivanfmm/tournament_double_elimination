@@ -1,0 +1,12 @@
+# Base comun a todos los ambientes (dev, qa, prd).
+# Los overlays solo agregan diferencias encima de esto.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tournament
+
+resources:
+  - namespace.yaml
+  - secret.yaml
+  - postgres.yaml
+  - api.yaml
