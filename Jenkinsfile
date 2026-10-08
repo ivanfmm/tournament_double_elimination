@@ -1,4 +1,4 @@
-// Actividad 3: pruebas automaticas como quality gate
+// Actividad 4: identidad inmutable del artefacto (tag = commit)
 pipeline {
     agent {
         label 'build-agent'
@@ -11,6 +11,8 @@ pipeline {
 
     environment {
         CONFIGURATION = 'Release'
+        REGISTRY = 'localhost:5000'
+        IMAGE_NAME = 'tournament-api'
     }
 
     stages {
@@ -49,6 +51,23 @@ pipeline {
                     archiveArtifacts artifacts: 'TestResults/**/*',
                                      allowEmptyArchive: true
                 }
+            }
+        }
+
+        stage('Version') {
+            steps {
+                script {
+                    // mismo commit = mismo tag, sin importar el numero de build
+                    env.SHORT_COMMIT = sh(
+                        script: 'git rev-parse --short=7 HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    env.IMAGE_TAG = "git-${env.SHORT_COMMIT}"
+                    env.IMAGE = "${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                }
+
+                echo "Build #${env.BUILD_NUMBER} -> release image: ${env.IMAGE}"
             }
         }
     }
