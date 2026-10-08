@@ -82,6 +82,13 @@ if (app.Environment.IsDevelopment())
 
 app.MapGet("/health", () => Results.Ok("Services running"));
 
+// Readiness para Kubernetes: 200 solo si la base de datos responde.
+// /health (arriba) solo dice que el proceso vive; este dice si puede atender.
+app.MapGet("/health/ready", async (TournamentDbContext db) =>
+    await db.Database.CanConnectAsync()
+        ? Results.Ok("Ready")
+        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
+
 app.MapTeamRoutes();
 app.MapTournamentRoutes();
 app.MapGroupRoutes();
