@@ -1,31 +1,35 @@
-// Actividad 1: primer pipeline
-// Solo verifica que cada agente tenga sus herramientas.
+// Actividad 2: checkout y build
 pipeline {
     agent {
         label 'build-agent'
     }
 
+    options {
+        // el job ya sabe de que repo/rama/commit viene (Multibranch);
+        // hacemos el checkout explicito en el stage Checkout
+        skipDefaultCheckout(true)
+        // dos builds a la vez pisarian el mismo cluster/registry
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        CONFIGURATION = 'Release'
+    }
+
     stages {
-        stage('Build Environment') {
+        stage('Checkout') {
             steps {
-                sh '''
-                    hostname
-                    dotnet --info
-                    podman version
-                '''
+                // checkout scm usa la URL, rama y commit configurados en el job
+                checkout scm
+                sh 'git log -1 --oneline'
             }
         }
 
-        stage('Deployment Environment') {
-            agent {
-                label 'deploy-agent'
-            }
+        stage('Build') {
             steps {
                 sh '''
-                    hostname
-                    git --version
-                    kubectl version --client
-                    curl --version
+                    dotnet restore TournamentServices.slnx
+                    dotnet build TournamentServices.slnx --configuration "$CONFIGURATION" --no-restore
                 '''
             }
         }
