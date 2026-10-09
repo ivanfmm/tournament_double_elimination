@@ -1,117 +1,71 @@
-using TournamentServices.Domain;
 using TournamentServices.Domain.Exceptions;
+using TournamentServices.Domain;
 using TournamentServices.Repositories;
 
 namespace TournamentServices.Delegates;
 
-public class MatchDelegate : IMatchDelegate
+public class MatchDelegate(IMatchRepository matchRepository, ITournamentRepository tournamentRepository, IGroupRepository groupRepository) : IMatchDelegate
 {
-    private readonly IMatchRepository _matchRepository;
-    private readonly ITeamRepository _teamRepository;
-    private readonly IGroupRepository _groupRepository;
-
-    public MatchDelegate(IMatchRepository matchRepository, ITeamRepository teamRepository, IGroupRepository groupRepository)
-    {
-        _matchRepository = matchRepository;
-        _teamRepository = teamRepository;
-        _groupRepository = groupRepository;
-    }
-
     public Task<IReadOnlyList<Match>> GetByTournamentAsync(string tournamentId)
-    {
-        return _matchRepository.GetByTournamentAsync(tournamentId);
-    }
+        => matchRepository.GetByTournamentAsync(tournamentId);
 
     public Task<Match?> GetByIdAsync(string id)
-    {
-        return _matchRepository.GetByIdAsync(id);
-    }
+        => matchRepository.GetByIdAsync(id);
 
     public async Task<Match> CreateAsync(string tournamentId, string homeTeamId, string visitorTeamId, string? groupId = null)
     {
-        await EnsureTeamExistsAsync(homeTeamId);
-        await EnsureTeamExistsAsync(visitorTeamId);
+        if (await tournamentRepository.GetByIdAsync(tournamentId) is null)
+            throw new NotFoundException($"Torneo '{tournamentId}' no encontrado.");
 
-        // Team no tiene TournamentId, asi que la pertenencia al torneo
-        // se deduce de los grupos: un equipo esta en el torneo si aparece
-        // en el TeamIds de alguno de sus grupos.
-        var groups = await _groupRepository.GetByTournamentAsync(tournamentId);
-        EnsureTeamIsInTournament(groups, homeTeamId);
-        EnsureTeamIsInTournament(groups, visitorTeamId);
+        if (string.Equals(homeTeamId, visitorTeamId, StringComparison.Ordinal))
+        {
+            throw new BusinessRuleException("El equipo local y el visitante no pueden ser el mismo.");
+        }
+        var groups = await groupRepository.GetByTournamentAsync(tournamentId);
 
         if (groupId is not null)
         {
-            EnsureTeamsShareGroup(groups, groupId, homeTeamId, visitorTeamId);
+            var group = groups.FirstOrDefault(g => g.Id == groupId) ?? throw new BusinessRuleException($"El grupo '{groupId}' no pertenece al torneo.");
+
+            EnsureTeamIn(group.TeamIds, homeTeamId, "local", "al grupo");
+            EnsureTeamIn(group.TeamIds, visitorTeamId, "visitante", "al grupo");
+        }
+        else
+        {
+            var tournamentTeamIds = groups.SelectMany(g => g.TeamIds).ToHashSet();
+            EnsureTeamIn(tournamentTeamIds, homeTeamId, "local", "al torneo");
+            EnsureTeamIn(tournamentTeamIds, visitorTeamId, "visitante", "al torneo");
         }
 
-        // El constructor de Match valida que home y visitor sean distintos
-        // y que ninguno venga vacio. No se repite esa logica aqui.
-        var match = new Match(
-            Guid.NewGuid().ToString(),
-            tournamentId,
-            homeTeamId,
-            visitorTeamId,
-            groupId);
-
-        await _matchRepository.AddAsync(match);
-        return match;
+        var match = new Match(Guid.NewGuid().ToString(), tournamentId, homeTeamId, visitorTeamId, groupId);
+        return await matchRepository.AddAsync(match);
     }
 
     public async Task<Match> UpdateScoreAsync(string matchId, int homeTeamScore, int visitorTeamScore)
     {
-        var match = await _matchRepository.GetByIdAsync(matchId);
-        if (match is null)
-        {
-            throw new NotFoundException($"No existe el partido '{matchId}'.");
-        }
+        var match = await matchRepository.GetByIdAsync(matchId) ?? throw new NotFoundException($"Partido '{matchId}' no encontrado.");
 
-        // El constructor de Score rechaza negativos y SetScore calcula
-        // Winner e IsCompleted. Esa logica vive en Domain, no aqui.
         match.SetScore(new Score(homeTeamScore, visitorTeamScore));
 
-        await _matchRepository.UpdateAsync(match);
+        await matchRepository.UpdateAsync(match);
         return match;
     }
 
     public async Task DeleteAsync(string id)
     {
-        var match = await _matchRepository.GetByIdAsync(id);
-        if (match is null)
+        var match = await matchRepository.GetByIdAsync(id) ?? throw new NotFoundException($"Partido '{id}' no encontrado.");
+        var deleted = await matchRepository.DeleteAsync(id);
+        if (!deleted)
         {
-            throw new NotFoundException($"No existe el partido '{id}'.");
-        }
-
-        await _matchRepository.DeleteAsync(id);
-    }
-
-    private async Task EnsureTeamExistsAsync(string teamId)
-    {
-        var team = await _teamRepository.GetByIdAsync(teamId);
-        if (team is null)
-        {
-            throw new DomainValidationException($"El equipo '{teamId}' no existe.");
+            throw new NotFoundException($"Partido '{id}' no encontrado.");
         }
     }
 
-    private static void EnsureTeamIsInTournament(IReadOnlyList<Group> groups, string teamId)
+    private static void EnsureTeamIn(IEnumerable<string> teamIds, string teamId, string role, string scope)
     {
-        if (!groups.Any(g => g.TeamIds.Contains(teamId)))
+        if (!teamIds.Contains(teamId))
         {
-            throw new DomainValidationException($"El equipo '{teamId}' no pertenece a este torneo.");
-        }
-    }
-
-    private static void EnsureTeamsShareGroup(IReadOnlyList<Group> groups, string groupId, string homeTeamId, string visitorTeamId)
-    {
-        var group = groups.FirstOrDefault(g => g.Id == groupId);
-        if (group is null)
-        {
-            throw new DomainValidationException($"El grupo '{groupId}' no pertenece a este torneo.");
-        }
-
-        if (!group.TeamIds.Contains(homeTeamId) || !group.TeamIds.Contains(visitorTeamId))
-        {
-            throw new DomainValidationException("Ambos equipos deben pertenecer al grupo indicado.");
+            throw new BusinessRuleException($"El equipo {role} '{teamId}' no pertenece {scope}.");
         }
     }
 }

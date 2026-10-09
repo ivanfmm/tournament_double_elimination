@@ -12,7 +12,7 @@ public class GroupRepository : IGroupRepository
         _context = context;
     }
 
-public async Task<IReadOnlyList<Group>> GetByTournamentAsync(string tournamentId)
+    public async Task<IReadOnlyList<Group>> GetByTournamentAsync(string tournamentId)
     {
         var groups = await _context.Groups
             .AsNoTracking()
