@@ -5,34 +5,32 @@ namespace TournamentServices.Repositories;
 public class TournamentRepository : ITournamentRepository
 {
     private readonly TournamentDbContext _context;
+    private readonly IGroupRepository _groupRepository;
 
-    public TournamentRepository(TournamentDbContext context)
+    public TournamentRepository(TournamentDbContext context,  IGroupRepository groupRepository)
     {
         _context = context;
+        _groupRepository = groupRepository;
     }
 
     public async Task<Tournament?> GetByIdAsync(string id)
     {
-        var tournament = await _context.Tournaments
+        return await _context.Tournaments
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == id);
+    }
 
-        if (tournament is null)
-        {
-            return null;
-        }
+    public async Task<Tournament?> GetByIdWithDetailsAsync(string id)
+    {
+        var tournament = await GetByIdAsync(id);
+        if (tournament is null) return null;
 
-        var groups = await _context.Groups
-            .AsNoTracking()
-            .Where(g => g.TournamentId == id)
-            .ToListAsync();
+        tournament.Groups.AddRange(await _groupRepository.GetByTournamentAsync(id));
 
         var matches = await _context.Matches
             .AsNoTracking()
             .Where(m => m.TournamentId == id)
             .ToListAsync();
-
-        tournament.Groups.AddRange(groups);
         tournament.Matches.AddRange(matches);
 
         return tournament;
@@ -76,5 +74,12 @@ public class TournamentRepository : ITournamentRepository
 
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<bool> ExistsByNameAsync(string name)
+    {
+        var normalized = name.Trim().ToLower();
+        return await _context.Tournaments
+            .AnyAsync(t => t.Name.ToLower() == normalized);
     }
 }

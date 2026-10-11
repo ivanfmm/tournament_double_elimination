@@ -7,7 +7,7 @@ namespace TournamentServices.Delegates;
 public class TournamentDelegate(ITournamentRepository tournamentRepository, IGroupRepository groupRepository, IMatchRepository matchRepository) : ITournamentDelegate
 {
     public async Task<Tournament> GetByIdAsync(string id)
-        => await tournamentRepository.GetByIdAsync(id)
+        => await tournamentRepository.GetByIdWithDetailsAsync(id)
            ?? throw new NotFoundException($"Torneo '{id}' no encontrado.");
 
     public Task<IReadOnlyList<Tournament>> GetAllAsync()
@@ -16,6 +16,11 @@ public class TournamentDelegate(ITournamentRepository tournamentRepository, IGro
     public async Task<Tournament> CreateAsync(Tournament tournament)
     {
         EnsureNameAndFormat(tournament);
+
+        if (await tournamentRepository.ExistsByNameAsync(tournament.Name))
+        {
+            throw new DuplicateNameException($"Ya existe un torneo con el nombre '{tournament.Name}'.");
+        }
 
         tournament.Id = Guid.NewGuid().ToString();
 
@@ -31,6 +36,11 @@ public class TournamentDelegate(ITournamentRepository tournamentRepository, IGro
 
         EnsureNameAndFormat(tournament);
         EnsureFormatFitsExistingGroups(existing, tournament.Format);
+
+        if (existing.Name != tournament.Name && await tournamentRepository.ExistsByNameAsync(tournament.Name))
+        {
+            throw new DuplicateNameException($"Ya existe un torneo con el nombre '{tournament.Name}'.");
+        }
 
         existing.Name = tournament.Name;
         existing.Format = tournament.Format;
