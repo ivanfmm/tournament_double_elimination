@@ -1,8 +1,20 @@
 -- podman run -d --replace --name=tournament_db --network development -e POSTGRES_PASSWORD=password -p 5432:5432 postgres:17.6-alpine3.22
 -- podman exec -i tournament_db psql -U postgres -d postgres < db_script.sql
 
-CREATE USER tournament_svc WITH PASSWORD 'password';
-CREATE USER tournament_admin WITH PASSWORD 'password';
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'tournament_svc') THEN
+        CREATE USER tournament_svc WITH PASSWORD 'password';
+    END IF;
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'tournament_admin') THEN
+        CREATE USER tournament_admin WITH PASSWORD 'password';
+    END IF;
+END
+$$;
+
+
+-- CREATE USER tournament_svc WITH PASSWORD 'password';
+-- CREATE USER tournament_admin WITH PASSWORD 'password';
 
 CREATE DATABASE tournament_db;
 
