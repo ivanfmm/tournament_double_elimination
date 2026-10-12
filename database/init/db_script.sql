@@ -48,6 +48,8 @@ CREATE TABLE TOURNAMENTS (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     name TEXT NOT NULL,
     format_type TEXT NOT NULL,
+    number_of_groups INT NOT NULL DEFAULT 0,
+    max_teams_per_group INT NOT NULL DEFAULT 0,
     last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ DEFAULT NULL
