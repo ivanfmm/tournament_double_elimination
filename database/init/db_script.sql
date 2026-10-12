@@ -52,12 +52,6 @@ CREATE TABLE GROUPS (
 );
 CREATE UNIQUE INDEX tournament_group_unique_name_idx ON GROUPS (tournament_id, name) WHERE deleted_at IS NULL;
 
-CREATE TABLE GROUP_TEAMS (
-    group_id UUID NOT NULL REFERENCES groups(id),
-    team_id  UUID NOT NULL REFERENCES teams(id),
-    PRIMARY KEY (group_id, team_id)
-);
-
 
 CREATE TABLE MATCHES (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -77,6 +71,12 @@ CREATE TABLE MATCHES (
     CONSTRAINT matches_winner_check CHECK (winner IN ('Home', 'Visitor')),
     CONSTRAINT matches_scores_non_negative_check CHECK (COALESCE(home_team_score, 0) >= 0 AND COALESCE(visitor_team_score, 0) >= 0),
     CONSTRAINT matches_score_both_or_none_check CHECK ((home_team_score IS NULL) = (visitor_team_score IS NULL))
+);
+
+CREATE TABLE GROUP_TEAMS (
+    group_id UUID NOT NULL REFERENCES groups(id),
+    team_id  UUID NOT NULL REFERENCES teams(id),
+    PRIMARY KEY (group_id, team_id)
 );
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO tournament_svc;
