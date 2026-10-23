@@ -5,8 +5,6 @@ namespace TournamentServices.Domain.Brackets;
 
 public class DoubleEliminationBracket
 {
-    private BracketSide Origin;
-
     private readonly string _tournamentId;
     private readonly int _rounds;
     private readonly BracketSlot[] _initialSlots;
@@ -213,6 +211,14 @@ public class DoubleEliminationBracket
 
         if (_nextWbRoundToMerge <= _rounds)
         {
+            // Si hay mas sobrevivientes que equipos por bajar del winners,
+            // primero juegan entre ellos; asi nadie pasa gratis al drop-in.
+            if (_lbCurrentSurvivors.Count > _wbRoundExpectedMatchCount[_nextWbRoundToMerge])
+            {
+                StartLbRound(_lbCurrentSurvivors, isDropIn: false, wbNewcomers: null, wbRoundLabel: null);
+                return;
+            }
+
             if (_wbRoundLosers.TryGetValue(_nextWbRoundToMerge, out var newcomers) &&
                 newcomers.Count == _wbRoundExpectedMatchCount[_nextWbRoundToMerge])
             {

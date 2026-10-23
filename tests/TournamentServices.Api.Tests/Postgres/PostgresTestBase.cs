@@ -14,7 +14,7 @@ namespace TournamentServices.Api.Tests.Postgres;
 //   bash:        export TEST_POSTGRES="Host=localhost;Port=5432;Username=postgres;Password=password"
 //   PowerShell:  $env:TEST_POSTGRES="Host=localhost;Port=5432;Username=postgres;Password=password"
 //
-// Ojo: TEST_POSTGRES NO es lo mismo que ConnectionStrings__Default (la que
+// Ojo: TEST_POSTGRES NO es lo mismo que ConnectionStrings__DefaultConnection (la que
 // usa la API). Esta apunta al SERVIDOR, no a una base: el nombre de la base
 // lo pone ConfigureDatabase abajo, una distinta por cada test.
 public sealed class PostgresFactAttribute : FactAttribute

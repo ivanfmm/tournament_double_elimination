@@ -132,6 +132,70 @@ public class DoubleEliminationBracketTests
         Assert.Equal("t1", bracket.ChampionTeamId);
     }
 
+    [Theory]
+    [InlineData(3)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    public void FullPlaythrough_AnyTeamCount_EveryNonChampionLosesExactlyTwice(int teamCount)
+    {
+        // Siempre gana el local: el campeon del winners gana la gran final (sin reset).
+        var teams = Enumerable.Range(1, teamCount).Select(i => $"t{i}").ToList();
+        var bracket = new DoubleEliminationBracket("tournament-1", teams, NoOpSeeder);
+        var losses = teams.ToDictionary(t => t, _ => 0);
+        var playedMatches = 0;
+
+        while (!bracket.IsCompleted)
+        {
+            var match = bracket.PendingMatches[0];
+            losses[match.VisitorTeamId]++;
+            bracket.ReportResult(match.Id, Winner.Home);
+            playedMatches++;
+        }
+
+        Assert.Equal(0, losses[bracket.ChampionTeamId!]);
+        Assert.All(losses.Where(l => l.Key != bracket.ChampionTeamId), l => Assert.Equal(2, l.Value));
+        Assert.Equal(2 * teamCount - 2, playedMatches);
+    }
+
+    [Fact]
+    public void FullPlaythrough_8Teams_WinnersFinalLoserPlaysLosersFinal()
+    {
+        // Con 8 equipos quedan 2 sobrevivientes en el losers cuando baja el
+        // perdedor de la final del winners. Primero deben jugar entre ellos y
+        // el ganador enfrenta al que bajo; ese partido es la final del losers.
+        var teams = Enumerable.Range(1, 8).Select(i => $"t{i}").ToList();
+        var bracket = new DoubleEliminationBracket("tournament-1", teams, NoOpSeeder);
+        string? winnersFinalLoser = null;
+        var checkedLosersFinal = false;
+
+        while (!bracket.IsCompleted)
+        {
+            var match = bracket.PendingMatches[0];
+            var isWinnersFinalLoserLbMatch = winnersFinalLoser is not null
+                && match.Id.StartsWith("lb")
+                && match.VisitorTeamId == winnersFinalLoser;
+
+            bracket.ReportResult(match.Id, Winner.Home);
+
+            if (match.Id == "wb-r3-m0")
+            {
+                winnersFinalLoser = match.VisitorTeamId;
+            }
+
+            if (isWinnersFinalLoserLbMatch)
+            {
+                var next = Assert.Single(bracket.PendingMatches);
+                Assert.Equal("grand-final", next.Id);
+                checkedLosersFinal = true;
+            }
+        }
+
+        Assert.True(checkedLosersFinal);
+    }
+
     private static void PlayByHomeTeamId(DoubleEliminationBracket bracket, string expectedWinnerTeamId)
     {
         var match = bracket.PendingMatches.First(m =>

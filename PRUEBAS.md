@@ -16,7 +16,7 @@ Hay **dos formas** de correr esto, y la connection string cambia según cuál us
 
 Dentro del dev container **no tienes que configurar nada**: el
 `docker-compose.dev.yml` ya define la variable de entorno
-`ConnectionStrings__Default: Host=tournament_db;...`, y esa variable
+`ConnectionStrings__DefaultConnection: Host=tournament_db;...`, y esa variable
 **gana** sobre `appsettings.Development.json`. Por eso ese archivo dice
 `localhost` y aun así funciona dentro del contenedor.
 
