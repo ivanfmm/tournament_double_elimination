@@ -1,5 +1,6 @@
 using TournamentServices.Domain.Exceptions;
 using TournamentServices.Domain;
+using TournamentServices.Domain.Enums;
 using TournamentServices.Repositories;
 
 namespace TournamentServices.Delegates;
@@ -14,8 +15,14 @@ public class MatchDelegate(IMatchRepository matchRepository, ITournamentReposito
 
     public async Task<Match> CreateAsync(string tournamentId, string homeTeamId, string visitorTeamId, string? groupId = null)
     {
-        if (await tournamentRepository.GetByIdAsync(tournamentId) is null)
-            throw new NotFoundException($"Torneo '{tournamentId}' no encontrado.");
+        var tournament = await tournamentRepository.GetByIdAsync(tournamentId)
+            ?? throw new NotFoundException($"Torneo '{tournamentId}' no encontrado.");
+
+        // En doble eliminacion los partidos solo los crea el bracket
+        if (tournament.Format.Type == TournamentType.DoubleElimination)
+        {
+            throw new BusinessRuleException("En doble eliminación los partidos los genera el bracket: usa POST /tournaments/{id}/start.");
+        }
 
         if (string.Equals(homeTeamId, visitorTeamId, StringComparison.Ordinal))
         {
@@ -45,6 +52,11 @@ public class MatchDelegate(IMatchRepository matchRepository, ITournamentReposito
     {
         var match = await matchRepository.GetByIdAsync(matchId) ?? throw new NotFoundException($"Partido '{matchId}' no encontrado.");
 
+        if (match.BracketKey is not null)
+        {
+            throw new BusinessRuleException("Este partido es del bracket: usa PATCH /tournaments/{id}/bracket/matches/{matchId}/score.");
+        }
+
         match.SetScore(new Score(homeTeamScore, visitorTeamScore));
 
         await matchRepository.UpdateAsync(match);
@@ -54,6 +66,12 @@ public class MatchDelegate(IMatchRepository matchRepository, ITournamentReposito
     public async Task DeleteAsync(string id)
     {
         var match = await matchRepository.GetByIdAsync(id) ?? throw new NotFoundException($"Partido '{id}' no encontrado.");
+
+        if (match.BracketKey is not null)
+        {
+            throw new BusinessRuleException("No se puede borrar un partido del bracket.");
+        }
+
         var deleted = await matchRepository.DeleteAsync(id);
         if (!deleted)
         {

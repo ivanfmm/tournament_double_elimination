@@ -311,6 +311,37 @@ public class DoubleEliminationBracket
     }
 
     // ----------------------------------------------------------------
+    // Reconstruccion desde la base de datos
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Arma el bracket con el orden ya sorteado y vuelve a aplicar los
+    /// resultados guardados. Los resultados deben venir en el MISMO orden
+    /// en que se reportaron, porque el emparejamiento del losers depende
+    /// del orden en que llegan los perdedores.
+    /// </summary>
+    public static DoubleEliminationBracket Replay(
+        string tournamentId,
+        IReadOnlyList<string> seededTeamIds,
+        IEnumerable<(string MatchKey, Winner Winner)> results)
+    {
+        var bracket = new DoubleEliminationBracket(tournamentId, seededTeamIds, new KeepOrderSeeder());
+
+        foreach (var (matchKey, winner) in results)
+        {
+            bracket.ReportResult(matchKey, winner);
+        }
+
+        return bracket;
+    }
+
+    // No baraja: el orden ya se sorteo al iniciar el torneo
+    private sealed class KeepOrderSeeder : ITeamSeeder
+    {
+        public IReadOnlyList<string> Seed(IReadOnlyList<string> teamIds) => teamIds;
+    }
+
+    // ----------------------------------------------------------------
     // API pública: reportar resultados
     // ----------------------------------------------------------------
 

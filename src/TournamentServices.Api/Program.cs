@@ -24,6 +24,7 @@ app.MapTeamRoutes();
 app.MapTournamentRoutes();
 app.MapGroupRoutes();
 app.MapMatchRoutes();
+app.MapBracketRoutes();
 
 app.Run();
 

@@ -50,6 +50,9 @@ CREATE TABLE TOURNAMENTS (
     format_type TEXT NOT NULL,
     number_of_groups INT NOT NULL DEFAULT 0,
     max_teams_per_group INT NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'Created',
+    champion_team_id UUID NULL REFERENCES teams(id),
+    seeded_team_ids TEXT[] NOT NULL DEFAULT '{}',
     last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ DEFAULT NULL
@@ -77,6 +80,8 @@ CREATE TABLE MATCHES (
     visitor_team_score INT NOT NULL DEFAULT 0,
     winner TEXT NULL,
     is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+    bracket_key TEXT NULL,
+    result_order INT NULL,
     last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ DEFAULT NULL,
@@ -86,6 +91,11 @@ CREATE TABLE MATCHES (
     CONSTRAINT matches_scores_non_negative_check CHECK (COALESCE(home_team_score, 0) >= 0 AND COALESCE(visitor_team_score, 0) >= 0),
     CONSTRAINT matches_score_both_or_none_check CHECK ((home_team_score IS NULL) = (visitor_team_score IS NULL))
 );
+
+CREATE UNIQUE INDEX match_unique_bracket_key_idx ON MATCHES (tournament_id, bracket_key)
+    WHERE bracket_key IS NOT NULL AND deleted_at IS NULL;
+CREATE UNIQUE INDEX match_unique_result_order_idx ON MATCHES (tournament_id, result_order)
+    WHERE result_order IS NOT NULL AND deleted_at IS NULL;
 
 CREATE TABLE GROUP_TEAMS (
     group_id UUID NOT NULL REFERENCES groups(id),

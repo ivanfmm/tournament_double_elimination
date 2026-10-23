@@ -189,3 +189,40 @@ dónde corras:
 | `500` | Cualquier otra excepción |
 
 El mapeo vive en `src/TournamentServices.Api/Middleware/ErrorHandlingMiddleware.cs`.
+
+---
+
+## Torneo de doble eliminación (bracket)
+
+Si tu base ya existía (volumen `tournament_pgdata`), corre primero la migración:
+
+```bash
+podman exec -i tournament_db psql -U tournament_admin -d tournament_db < database/migrations/001_double_elimination.sql
+```
+
+Flujo (API en `localhost:8081`):
+
+```bash
+# 1. Crear torneo DOUBLE_ELIMINATION, sus grupos y asignar equipos (rutas de siempre)
+# 2. Iniciar: sortea los equipos y crea la ronda 1
+curl -X POST localhost:8081/tournaments/{id}/start
+
+# 3. Ver partidos pendientes (isCompleted = false)
+curl localhost:8081/tournaments/{id}/matches
+
+# 4. Reportar resultado (no se permiten empates ni cambiar un resultado)
+curl -X PATCH localhost:8081/tournaments/{id}/bracket/matches/{matchId}/score \
+  -H "Content-Type: application/json" -d '{"homeTeamScore": 3, "visitorTeamScore": 1}'
+
+# Repite 3 y 4 hasta que el torneo quede en FINISHED
+# 5. Campeón
+curl localhost:8081/tournaments/{id}/champion
+```
+
+Una vez iniciado, el torneo ya no acepta cambios de formato, grupos nuevos
+ni equipos nuevos, y los partidos del bracket no se pueden crear, editar
+ni borrar con las rutas de `/matches`.
+
+Las operaciones del bracket de un mismo torneo se procesan de una en una.
+Si aun asi dos peticiones chocan en la base, la API responde `409 Conflict`:
+basta con reintentar.

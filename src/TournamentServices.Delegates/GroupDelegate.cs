@@ -1,13 +1,19 @@
 using TournamentServices.Domain.Exceptions;
 using TournamentServices.Domain;
+using TournamentServices.Domain.Enums;
 using TournamentServices.Repositories;
 
 namespace TournamentServices.Delegates;
 
 public class GroupDelegate(IGroupRepository groupRepository,ITournamentRepository tournamentRepository, ITeamRepository teamRepository) : IGroupDelegate
 {
-    public Task<IReadOnlyList<Group>> GetByTournamentAsync(string tournamentId)
-        => groupRepository.GetByTournamentAsync(tournamentId);
+    public async Task<IReadOnlyList<Group>> GetByTournamentAsync(string tournamentId)
+    {
+        _ = await tournamentRepository.GetByIdAsync(tournamentId)
+            ?? throw new NotFoundException($"Torneo '{tournamentId}' no encontrado.");
+
+        return await groupRepository.GetByTournamentAsync(tournamentId);
+    }
 
     public async Task<Group?> GetByIdAsync(string tournamentId, string groupId)
     {
@@ -20,6 +26,8 @@ public class GroupDelegate(IGroupRepository groupRepository,ITournamentRepositor
     {
         var tournament = await tournamentRepository.GetByIdAsync(tournamentId)
             ?? throw new NotFoundException($"Torneo '{tournamentId}' no encontrado.");
+
+        EnsureNotStarted(tournament);
  
         var group = new Group(Guid.NewGuid().ToString(), tournamentId, name);
  
@@ -70,7 +78,14 @@ public class GroupDelegate(IGroupRepository groupRepository,ITournamentRepositor
         var tournament = await tournamentRepository.GetByIdAsync(tournamentId)
             ?? throw new NotFoundException($"Torneo '{tournamentId}' no encontrado.");
 
+        EnsureNotStarted(tournament);
+
         var group = await GetExistingGroupAsync(tournamentId, groupId);
+
+        if (teamIds.Count == 0)
+        {
+            throw new BusinessRuleException("La lista de equipos no puede venir vacía.");
+        }
 
         if (teamIds.Count != teamIds.Distinct().Count())
         {
@@ -106,6 +121,15 @@ public class GroupDelegate(IGroupRepository groupRepository,ITournamentRepositor
         }
 
         await groupRepository.UpdateAsync(group);
+    }
+
+    // Una vez iniciado el torneo, los equipos inscritos ya no pueden cambiar
+    private static void EnsureNotStarted(Tournament tournament)
+    {
+        if (tournament.Status != TournamentStatus.Created)
+        {
+            throw new BusinessRuleException("El torneo ya inició; no se pueden cambiar grupos ni equipos.");
+        }
     }
 
     private async Task<Group> GetExistingGroupAsync(string tournamentId, string groupId)

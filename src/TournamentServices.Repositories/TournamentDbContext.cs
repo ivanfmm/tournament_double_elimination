@@ -58,6 +58,10 @@ public class TournamentDbContext : DbContext
                 f.Property(x => x.Type).HasColumnName("format_type").HasConversion<string>();
             });
             b.Navigation(t => t.Format).IsRequired();
+
+            b.Property(t => t.Status).HasColumnName("status").HasConversion<string>();
+            b.Property(t => t.ChampionTeamId).HasColumnName("champion_team_id");
+            b.Property(t => t.SeededTeamIds).HasColumnName("seeded_team_ids");
             
             b.Ignore(t => t.Groups);
             b.Ignore(t => t.Matches);
@@ -117,6 +121,14 @@ public class TournamentDbContext : DbContext
 
             b.Property(m => m.Winner).HasColumnName("winner").HasConversion<string>();
             b.Property(m => m.IsCompleted).HasColumnName("is_completed");
+            b.Property(m => m.BracketKey).HasColumnName("bracket_key");
+            b.Property(m => m.ResultOrder).HasColumnName("result_order");
+            b.HasIndex(m => new { m.TournamentId, m.BracketKey })
+                .IsUnique()
+                .HasFilter("bracket_key IS NOT NULL AND deleted_at IS NULL");
+            b.HasIndex(m => new { m.TournamentId, m.ResultOrder })
+                .IsUnique()
+                .HasFilter("result_order IS NOT NULL AND deleted_at IS NULL");
 
             b.HasOne<Group>()
                 .WithMany()

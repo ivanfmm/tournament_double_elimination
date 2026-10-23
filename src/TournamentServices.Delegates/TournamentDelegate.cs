@@ -1,5 +1,6 @@
 using TournamentServices.Domain.Exceptions;
 using TournamentServices.Domain;
+using TournamentServices.Domain.Enums;
 using TournamentServices.Repositories;
 
 namespace TournamentServices.Delegates;
@@ -35,6 +36,7 @@ public class TournamentDelegate(ITournamentRepository tournamentRepository, IGro
         var existing = await GetByIdAsync(tournament.Id);
 
         EnsureNameAndFormat(tournament);
+        if (existing.Format != tournament.Format) EnsureNotStarted(existing);
         EnsureFormatFitsExistingGroups(existing, tournament.Format);
 
         if (existing.Name != tournament.Name && await tournamentRepository.ExistsByNameAsync(tournament.Name))
@@ -58,6 +60,7 @@ public class TournamentDelegate(ITournamentRepository tournamentRepository, IGro
         var newFormat = existing.Format;
         if (patch.HasFormatChanges)
         {
+            EnsureNotStarted(existing);
             newFormat = new TournamentFormat(patch.MaxTeamsPerGroup ?? existing.Format.MaxTeamsPerGroup, patch.NumberOfGroups ?? existing.Format.NumberOfGroups, patch.Type ?? existing.Format.Type);
             EnsureFormatFitsExistingGroups(existing, newFormat);
         }
@@ -89,6 +92,15 @@ public class TournamentDelegate(ITournamentRepository tournamentRepository, IGro
         if (!deleted)
         {
             throw new NotFoundException($"Torneo '{id}' no encontrado.");
+        }
+    }
+
+    // El formato no puede cambiar una vez iniciado el torneo
+    private static void EnsureNotStarted(Tournament tournament)
+    {
+        if (tournament.Status != TournamentStatus.Created)
+        {
+            throw new BusinessRuleException("El torneo ya inició; no se puede cambiar el formato.");
         }
     }
 

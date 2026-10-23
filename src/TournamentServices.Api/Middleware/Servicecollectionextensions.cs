@@ -1,4 +1,5 @@
 using TournamentServices.Delegates;
+using TournamentServices.Domain.Brackets;
 using TournamentServices.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +22,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITournamentDelegate, TournamentDelegate>();
         services.AddScoped<IGroupDelegate, GroupDelegate>();
         services.AddScoped<IMatchDelegate, MatchDelegate>();
+        services.AddScoped<IBracketDelegate, BracketDelegate>();
+
+        // Scoped y no Singleton: Random no es seguro entre hilos
+        services.AddScoped<ITeamSeeder>(_ => new RandomTeamSeeder());
 
         return services;
     }
