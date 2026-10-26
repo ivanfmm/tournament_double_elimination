@@ -71,6 +71,13 @@ pipeline {
                 '''
             }
         }
+        stage('Deploy Dev') {
+            agent { label 'deploy-agent' }
+            steps {
+                checkout scm
+                sh './scripts/deploy.sh kind-dev dev "$IMAGE"'
+            }
+        }
     }
     post {
         success { echo "Imagen publicada: ${env.IMAGE}" }

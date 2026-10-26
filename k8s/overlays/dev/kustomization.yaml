@@ -1,0 +1,14 @@
+# Overlay de dev: la base + lo que solo aplica en desarrollo.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# etiqueta environment=dev en todo (sin tocar los selectors)
+labels:
+  - pairs:
+      environment: dev
+
+patches:
+  - path: api-env.yaml
