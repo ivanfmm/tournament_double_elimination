@@ -56,24 +56,17 @@ public class TournamentRepository : ITournamentRepository
         await _context.SaveChangesAsync();
     }
 
+    // Soft delete, igual que equipos, grupos y partidos. Antes era un borrado
+    // real y chocaba con la llave foranea de los grupos ya marcados con
+    // deleted_at. Los grupos y partidos los marca TournamentDelegate.
     public async Task<bool> DeleteAsync(string id)
     {
-        var tournament = await _context.Tournaments.FindAsync(id);
+        int rowsAffected = await _context.Tournaments
+            .Where(t => t.Id == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(t => EF.Property<DateTime?>(t, "deleted_at"), DateTime.UtcNow));
 
-        if (tournament is null)
-        {
-            return false;
-        }
-
-        var groups = await _context.Groups.Where(g => g.TournamentId == id).ToListAsync();
-        var matches = await _context.Matches.Where(m => m.TournamentId == id).ToListAsync();
-
-        _context.Groups.RemoveRange(groups);
-        _context.Matches.RemoveRange(matches);
-        _context.Tournaments.Remove(tournament);
-
-        await _context.SaveChangesAsync();
-        return true;
+        return rowsAffected > 0;
     }
 
     public async Task<bool> ExistsByNameAsync(string name)

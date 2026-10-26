@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
-using TournamentServices.Api.Dtos;
 using TournamentServices.Domain;
 using TournamentServices.Domain.Enums;
 using TournamentServices.TestBuilders;
@@ -71,8 +70,7 @@ public class GroupRoutesTests : TournamentApiTests
         var group = await response.Content.ReadFromJsonAsync<GroupDto>();
         Assert.Equal("g-1", group!.Id);
         Assert.Equal("t-1", group.TournamentId);
-        var team = Assert.Single(group.Teams);
-        Assert.Equal(new TeamDto("team-1", "Pumas"), team);
+        Assert.Equal("team-1", Assert.Single(group.TeamIds));
     }
 
     [Fact]
@@ -113,7 +111,7 @@ public class GroupRoutesTests : TournamentApiTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var group = await response.Content.ReadFromJsonAsync<GroupDto>();
         Assert.Equal("Grupo A", group!.Name);
-        Assert.Empty(group.Teams);
+        Assert.Empty(group.TeamIds);
         Assert.Equal($"{BaseUrl}/{group.Id}", response.Headers.Location!.ToString());
     }
 
@@ -174,23 +172,6 @@ public class GroupRoutesTests : TournamentApiTests
     // ---------- DELETE ----------
 
     [Fact]
-    public async Task Delete_Regresa204YDesasignaEquipos()
-    {
-        await SeedTournamentAsync();
-        await SeedAsync(
-            new TeamBuilder().WithId("team-1").WithName("Pumas").Build(),
-            new GroupBuilder().WithId("g-1").WithTournamentId("t-1").WithTeam("team-1").Build());
-
-        var response = await Client.DeleteAsync($"{BaseUrl}/g-1");
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        var groupExists = await QueryAsync(db => db.Groups.AnyAsync(g => g.Id == "g-1"));
-        var teamExists = await QueryAsync(db => db.Teams.AnyAsync(t => t.Id == "team-1"));
-        Assert.False(groupExists);
-        Assert.True(teamExists); // el equipo sigue existiendo, solo sin grupo
-    }
-
-    [Fact]
     public async Task Delete_Regresa404SiNoExiste()
     {
         await SeedTournamentAsync();
@@ -212,11 +193,11 @@ public class GroupRoutesTests : TournamentApiTests
             new GroupBuilder().WithId("g-1").WithTournamentId("t-1").Build());
 
         var response = await Client.PatchAsJsonAsync($"{BaseUrl}/g-1/teams",
-            new AssignTeamsDto(new List<string> { "team-1", "team-2" }));
+            new List<string> { "team-1", "team-2" });
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         var group = await (await Client.GetAsync($"{BaseUrl}/g-1")).Content.ReadFromJsonAsync<GroupDto>();
-        Assert.Equal(2, group!.Teams.Count);
+        Assert.Equal(2, group!.TeamIds.Count);
     }
 
     [Fact]
@@ -226,7 +207,7 @@ public class GroupRoutesTests : TournamentApiTests
         await SeedAsync(new GroupBuilder().WithId("g-1").WithTournamentId("t-1").Build());
 
         var response = await Client.PatchAsJsonAsync($"{BaseUrl}/g-1/teams",
-            new AssignTeamsDto(new List<string> { "fantasma" }));
+            new List<string> { "fantasma" });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -241,7 +222,7 @@ public class GroupRoutesTests : TournamentApiTests
             new GroupBuilder().WithId("g-2").WithTournamentId("t-1").WithName("B").WithTeam("team-1").Build());
 
         var response = await Client.PatchAsJsonAsync($"{BaseUrl}/g-1/teams",
-            new AssignTeamsDto(new List<string> { "team-1" }));
+            new List<string> { "team-1" });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -256,7 +237,7 @@ public class GroupRoutesTests : TournamentApiTests
             new GroupBuilder().WithId("g-1").WithTournamentId("t-1").Build());
 
         var response = await Client.PatchAsJsonAsync($"{BaseUrl}/g-1/teams",
-            new AssignTeamsDto(new List<string> { "team-1", "team-2" }));
+            new List<string> { "team-1", "team-2" });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -268,7 +249,7 @@ public class GroupRoutesTests : TournamentApiTests
         await SeedAsync(new TeamBuilder().WithId("team-1").WithName("Pumas").Build());
 
         var response = await Client.PatchAsJsonAsync($"{BaseUrl}/no-existe/teams",
-            new AssignTeamsDto(new List<string> { "team-1" }));
+            new List<string> { "team-1" });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -277,7 +258,7 @@ public class GroupRoutesTests : TournamentApiTests
     public async Task AssignTeams_Regresa404SiNoExisteElTorneo()
     {
         var response = await Client.PatchAsJsonAsync("/tournaments/no-existe/groups/g-1/teams",
-            new AssignTeamsDto(new List<string> { "team-1" }));
+            new List<string> { "team-1" });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

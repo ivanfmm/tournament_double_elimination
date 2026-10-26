@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
-using TournamentServices.Api.Dtos;
 using TournamentServices.Domain.Enums;
 
 namespace TournamentServices.Api.Tests.Postgres;
@@ -32,14 +31,14 @@ public class PostgresFlowTests : PostgresTestBase
         var repeated = await Client.PostAsJsonAsync(groupsUrl, new CreateGroupDto("grupo a"), JsonOptions);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, repeated.StatusCode);
 
-        // 5. Asignar equipos (la lista TeamIds se guarda como JSON en Postgres)
+        // 5. Asignar equipos (se guardan en la tabla group_teams)
         var assign = await Client.PatchAsJsonAsync($"{groupsUrl}/{group.Id}/teams",
-            new AssignTeamsDto(new List<string> { pumas.Id, chivas.Id }), JsonOptions);
+            new List<string> { pumas.Id, chivas.Id }, JsonOptions);
         Assert.Equal(HttpStatusCode.NoContent, assign.StatusCode);
 
         // 6. PATCH parcial del torneo
         var patch = await Client.PatchAsJsonAsync($"/tournaments/{tournament.Id}",
-            new PatchTournamentDto("Copa Final", null), JsonOptions);
+            new PatchTournamentDto(Name: "Copa Final"), JsonOptions);
         Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
 
         // 7. Leer el torneo completo: grupo con sus 2 equipos y formato intacto
@@ -47,7 +46,7 @@ public class PostgresFlowTests : PostgresTestBase
         Assert.Equal("Copa Final", loaded.Name);
         Assert.Equal(new TournamentFormatDto(2, 2, TournamentType.RoundRobin), loaded.Format);
         var loadedGroup = Assert.Single(loaded.Groups);
-        Assert.Equal(new[] { "Chivas", "Pumas" }, loadedGroup.Teams.Select(t => t.Name).OrderBy(n => n));
+        Assert.Equal(new[] { pumas.Id, chivas.Id }.OrderBy(id => id), loadedGroup.TeamIds.OrderBy(id => id));
 
         // 8. Borrar el torneo borra sus grupos en cascada
         var delete = await Client.DeleteAsync($"/tournaments/{tournament.Id}");

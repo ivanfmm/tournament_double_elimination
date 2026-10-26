@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using TournamentServices.Domain;
 using TournamentServices.Repositories;
 
 namespace TournamentServices.Api.Tests;
@@ -61,11 +62,23 @@ public abstract class TournamentApiTests : IDisposable
     }
 
     // Inserta datos directo en la base, sin pasar por la API.
+    // Orden: todo lo demas, luego grupos, luego partidos (por las llaves foraneas).
+    // Los equipos de un grupo viven en group_teams, por eso los grupos se
+    // guardan con el repositorio y no con AddRange.
     protected async Task SeedAsync(params object[] entities)
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TournamentDbContext>();
-        db.AddRange(entities);
+        db.AddRange(entities.Where(e => e is not Group and not Match));
+        await db.SaveChangesAsync();
+
+        var groupRepository = scope.ServiceProvider.GetRequiredService<IGroupRepository>();
+        foreach (var group in entities.OfType<Group>())
+        {
+            await groupRepository.AddAsync(group);
+        }
+
+        db.AddRange(entities.OfType<Match>());
         await db.SaveChangesAsync();
     }
 

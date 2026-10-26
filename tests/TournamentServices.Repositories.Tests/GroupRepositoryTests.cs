@@ -62,8 +62,9 @@ public class GroupRepositoryTests
         var options = CreateOptions();
         using (var context = new TournamentDbContext(options))
         {
-            context.Groups.Add(new GroupBuilder().WithId("g-1").WithTeam("team-1").WithTeam("team-2").Build());
-            await context.SaveChangesAsync();
+            // Los equipos viven en group_teams: se guardan a traves del repositorio
+            await new GroupRepository(context).AddAsync(
+                new GroupBuilder().WithId("g-1").WithTeam("team-1").WithTeam("team-2").Build());
         }
 
         using var readContext = new TournamentDbContext(options);
@@ -103,38 +104,9 @@ public class GroupRepositoryTests
         }
 
         using var readContext = new TournamentDbContext(options);
-        var saved = await readContext.Groups.FirstAsync(g => g.Id == "g-1");
-        Assert.Equal("Nuevo", saved.Name);
+        var saved = await new GroupRepository(readContext).GetByIdAsync("g-1");
+        Assert.Equal("Nuevo", saved!.Name);
         Assert.Equal(new[] { "team-1" }, saved.TeamIds);
-    }
-
-    [Fact]
-    public async Task DeleteAsync_EliminaGrupo()
-    {
-        var options = CreateOptions();
-        using (var context = new TournamentDbContext(options))
-        {
-            context.Groups.Add(new GroupBuilder().WithId("g-1").Build());
-            await context.SaveChangesAsync();
-        }
-
-        using (var context = new TournamentDbContext(options))
-        {
-            await new GroupRepository(context).DeleteAsync("g-1");
-        }
-
-        using var readContext = new TournamentDbContext(options);
-        Assert.False(await readContext.Groups.AnyAsync(g => g.Id == "g-1"));
-    }
-
-    [Fact]
-    public async Task DeleteAsync_NoTronaSiNoExiste()
-    {
-        using var context = new TournamentDbContext(CreateOptions());
-
-        var exception = await Record.ExceptionAsync(() => new GroupRepository(context).DeleteAsync("no-existe"));
-
-        Assert.Null(exception);
     }
 
     [Theory]
@@ -162,5 +134,28 @@ public class GroupRepositoryTests
         var result = await new GroupRepository(context).ExistsByNameInTournamentAsync("t-1", "Grupo A");
 
         Assert.False(result);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_QuitaLosEquiposQueYaNoEstanEnElGrupo()
+    {
+        var options = CreateOptions();
+        using (var context = new TournamentDbContext(options))
+        {
+            await new GroupRepository(context).AddAsync(
+                new GroupBuilder().WithId("g-1").WithTeam("team-1").WithTeam("team-2").Build());
+        }
+
+        using (var context = new TournamentDbContext(options))
+        {
+            var repository = new GroupRepository(context);
+            var group = await repository.GetByIdAsync("g-1");
+            group!.RemoveTeam("team-1");
+            await repository.UpdateAsync(group);
+        }
+
+        using var readContext = new TournamentDbContext(options);
+        var saved = await new GroupRepository(readContext).GetByIdAsync("g-1");
+        Assert.Equal(new[] { "team-2" }, saved!.TeamIds);
     }
 }

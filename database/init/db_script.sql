@@ -36,7 +36,7 @@ GRANT CREATE ON SCHEMA public TO tournament_admin;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE TEAMS (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -45,13 +45,13 @@ CREATE TABLE TEAMS (
 CREATE UNIQUE INDEX team_unique_name_idx ON teams (name) WHERE deleted_at IS NULL;
 
 CREATE TABLE TOURNAMENTS (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     format_type TEXT NOT NULL,
     number_of_groups INT NOT NULL DEFAULT 0,
     max_teams_per_group INT NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'Created',
-    champion_team_id UUID NULL REFERENCES teams(id),
+    champion_team_id TEXT NULL REFERENCES teams(id),
     seeded_team_ids TEXT[] NOT NULL DEFAULT '{}',
     last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -60,8 +60,8 @@ CREATE TABLE TOURNAMENTS (
 CREATE UNIQUE INDEX tournament_unique_name_idx ON TOURNAMENTS (name) WHERE deleted_at IS NULL;
 
 CREATE TABLE GROUPS (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    tournament_id UUID not null references TOURNAMENTS(id),
+    id TEXT PRIMARY KEY,
+    tournament_id TEXT not null references TOURNAMENTS(id),
     name TEXT NOT NULL,
     last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -71,11 +71,11 @@ CREATE UNIQUE INDEX tournament_group_unique_name_idx ON GROUPS (tournament_id, n
 
 
 CREATE TABLE MATCHES (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    tournament_id UUID NOT NULL REFERENCES tournaments(id),
-    group_id UUID NULL REFERENCES groups(id) ON DELETE SET NULL,
-    home_team_id UUID NOT NULL REFERENCES teams(id),
-    visitor_team_id UUID NOT NULL REFERENCES teams(id),
+    id TEXT PRIMARY KEY,
+    tournament_id TEXT NOT NULL REFERENCES tournaments(id),
+    group_id TEXT NULL REFERENCES groups(id) ON DELETE SET NULL,
+    home_team_id TEXT NOT NULL REFERENCES teams(id),
+    visitor_team_id TEXT NOT NULL REFERENCES teams(id),
     home_team_score INT NOT NULL DEFAULT 0,
     visitor_team_score INT NOT NULL DEFAULT 0,
     winner TEXT NULL,
@@ -98,8 +98,8 @@ CREATE UNIQUE INDEX match_unique_result_order_idx ON MATCHES (tournament_id, res
     WHERE result_order IS NOT NULL AND deleted_at IS NULL;
 
 CREATE TABLE GROUP_TEAMS (
-    group_id UUID NOT NULL REFERENCES groups(id),
-    team_id  UUID NOT NULL REFERENCES teams(id),
+    group_id TEXT NOT NULL REFERENCES groups(id),
+    team_id  TEXT NOT NULL REFERENCES teams(id),
     PRIMARY KEY (group_id, team_id)
 );
 

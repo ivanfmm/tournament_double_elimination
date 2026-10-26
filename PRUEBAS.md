@@ -194,10 +194,13 @@ El mapeo vive en `src/TournamentServices.Api/Middleware/ErrorHandlingMiddleware.
 
 ## Torneo de doble eliminación (bracket)
 
-Si tu base ya existía (volumen `tournament_pgdata`), corre primero la migración:
+Si tu volumen `tournament_pgdata` se creó antes de este cambio, recréalo.
+`db_script.sql` usaba ids `UUID` y el modelo de EF usa `text`, así que con
+ese esquema la API no podía guardar nada; no hay datos que perder:
 
 ```bash
-podman exec -i tournament_db psql -U tournament_admin -d tournament_db < database/migrations/001_double_elimination.sql
+podman compose -f docker-compose.dev.yml down -v
+podman compose -f docker-compose.dev.yml up -d
 ```
 
 Flujo (API en `localhost:8081`):

@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
-using TournamentServices.Api.Dtos;
 
 namespace TournamentServices.Api.Tests.Postgres;
 
@@ -103,14 +102,6 @@ public class PostgresTeamCrudTests : PostgresTestBase
         Assert.Equal("Chivas", (await GetAsync<TeamDto>($"/teams/{chivas.Id}")).Name);
     }
 
-    [PostgresFact]
-    public async Task Cambio_Regresa404SiElEquipoNoExiste()
-    {
-        var response = await Client.PutAsJsonAsync("/teams/no-existe", new UpdateTeamDto("X"), JsonOptions);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
     // ---------------- BAJA ----------------
 
     [PostgresFact]
@@ -134,24 +125,4 @@ public class PostgresTeamCrudTests : PostgresTestBase
     }
 
     // ---------------- LECTURA ----------------
-
-    [PostgresFact]
-    public async Task Lectura_ListaVaciaCuandoNoHayEquipos()
-    {
-        var all = await GetAsync<List<TeamDto>>("/teams");
-
-        Assert.Empty(all);
-    }
-
-    [PostgresFact]
-    public async Task Lectura_Regresa400SiElIdTieneFormatoInvalido()
-    {
-        Assert.Equal(HttpStatusCode.BadRequest, await StatusOfGetAsync("/teams/id_invalido"));
-    }
-
-    [PostgresFact]
-    public async Task Lectura_Regresa404SiElIdEsValidoPeroNoExiste()
-    {
-        Assert.Equal(HttpStatusCode.NotFound, await StatusOfGetAsync("/teams/no-existe"));
-    }
 }

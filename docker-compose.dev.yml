@@ -43,7 +43,7 @@ services:
         condition: service_healthy
     environment:
       ConnectionStrings__DefaultConnection: "Host=tournament_db;Port=5432;Database=tournament_db;Username=tournament_svc;Password=password"
-      TEST_POSTGRES: "Host=tournament_db;Port=5432;Database=tournament_db;Username=tournament_svc;Password=password"
+      TEST_POSTGRES: "Host=tournament_db;Port=5432;Username=postgres;Password=password"
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
     volumes:

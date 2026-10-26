@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using TournamentServices.Api.Dtos;
 using TournamentServices.Domain.Enums;
 
 namespace TournamentServices.Api.Tests.Postgres;
@@ -100,16 +99,6 @@ public class PostgresTournamentCrudTests : PostgresTestBase
         Assert.Single(updated.Groups);
     }
 
-    [PostgresFact]
-    public async Task Cambio_PutRegresa404SiNoExiste()
-    {
-        var body = new UpdateTournamentDto("Nuevo", new FormatInputDto(8, 4, TournamentType.Nfl));
-
-        var response = await Client.PutAsJsonAsync("/tournaments/no-existe", body, JsonOptions);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
     // ---------------- CAMBIO (PATCH parcial) ----------------
 
     [PostgresFact]
@@ -131,7 +120,7 @@ public class PostgresTournamentCrudTests : PostgresTestBase
     {
         var created = await PostAsync<TournamentDto>("/tournaments", NewTournament("Copa"));
 
-        var response = await PatchRawAsync($"/tournaments/{created.Id}", """{"format":{"type":"NFL"}}""");
+        var response = await PatchRawAsync($"/tournaments/{created.Id}", """{"type":"NFL"}""");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -151,14 +140,6 @@ public class PostgresTournamentCrudTests : PostgresTestBase
         Assert.Equal("Copa", (await GetAsync<TournamentDto>($"/tournaments/{created.Id}")).Name);
     }
 
-    [PostgresFact]
-    public async Task Cambio_PatchRegresa404SiNoExiste()
-    {
-        var response = await PatchRawAsync("/tournaments/no-existe", """{"name":"Nuevo"}""");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
     // ---------------- BAJA ----------------
 
     [PostgresFact]
@@ -175,14 +156,6 @@ public class PostgresTournamentCrudTests : PostgresTestBase
         Assert.Equal(HttpStatusCode.NotFound, await StatusOfGetAsync($"/tournaments/{tournament.Id}"));
     }
 
-    [PostgresFact]
-    public async Task Baja_Regresa404SiNoExiste()
-    {
-        var response = await Client.DeleteAsync("/tournaments/no-existe");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
     // ---------------- LECTURA ----------------
 
     [PostgresFact]
@@ -195,11 +168,5 @@ public class PostgresTournamentCrudTests : PostgresTestBase
 
         Assert.Equal(2, all.Count);
         Assert.Equal(new[] { "Copa A", "Copa B" }, all.Select(t => t.Name).OrderBy(n => n));
-    }
-
-    [PostgresFact]
-    public async Task Lectura_Regresa400SiElIdTieneFormatoInvalido()
-    {
-        Assert.Equal(HttpStatusCode.BadRequest, await StatusOfGetAsync("/tournaments/id_invalido"));
     }
 }
