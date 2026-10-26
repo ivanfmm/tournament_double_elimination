@@ -84,7 +84,7 @@ public class GroupDelegate(IGroupRepository groupRepository,ITournamentRepositor
 
         if (teamIds.Count == 0)
         {
-            throw new BusinessRuleException("La lista de equipos no puede venir vacía.");
+            throw new DomainValidationException("La lista de equipos no puede venir vacía.");
         }
 
         if (teamIds.Count != teamIds.Distinct().Count())

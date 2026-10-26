@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using TournamentServices.Repositories;
@@ -48,7 +50,9 @@ public sealed class PostgresTheoryAttribute : TheoryAttribute
 //
 // Cada test (xUnit crea una instancia por test) levanta la API completa
 // apuntando a SU PROPIA base tournament_test_xxxxxxxxxxxx, que se crea
-// sola con EnsureCreated() al arrancar Program.cs y se borra en Dispose.
+// en el constructor con las tablas de database/init/db_script.sql (el mismo
+// esquema de produccion, no el de EnsureCreated) y se borra en Dispose.
+// Asi, si el modelo de EF y el script dejan de coincidir, estas pruebas fallan.
 // Asi los tests son aislados, corren en paralelo y no ensucian la base
 // "tournament" que usa la API de desarrollo.
 public abstract class PostgresTestBase : TournamentApiTests
@@ -56,6 +60,43 @@ public abstract class PostgresTestBase : TournamentApiTests
     // Toda base creada por estas pruebas empieza con este prefijo, y es
     // lo unico que Dispose tiene permitido borrar. Ver EnsureSafeToDelete.
     private const string TestDatabasePrefix = "tournament_test_";
+
+    protected PostgresTestBase()
+    {
+        // Si el test se salta no hay servidor al cual conectarse
+        if (PostgresFactAttribute.IsEnabled)
+        {
+            using var scope = Factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<TournamentDbContext>();
+            EnsureSafeToDelete(db);
+            db.Database.GetService<IRelationalDatabaseCreator>().Create();
+            // ExecuteSqlRaw trata { } como marcadores de formato: se escapan (DEFAULT '{}')
+            db.Database.ExecuteSqlRaw(LoadSchemaFromDbScript().Replace("{", "{{").Replace("}", "}}"));
+        }
+    }
+
+    // Toma db_script.sql y deja solo lo que va dentro de la base: lo que sigue
+    // al ultimo \connect, sin los GRANT (los roles no existen en el servidor de prueba).
+    private static string LoadSchemaFromDbScript()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "database", "init", "db_script.sql")))
+        {
+            dir = dir.Parent;
+        }
+
+        if (dir is null)
+        {
+            throw new FileNotFoundException("No se encontro database/init/db_script.sql subiendo desde " + AppContext.BaseDirectory);
+        }
+
+        var lines = File.ReadAllLines(Path.Combine(dir.FullName, "database", "init", "db_script.sql"));
+        var lastConnect = Array.FindLastIndex(lines, l => l.TrimStart().StartsWith(@"\connect"));
+
+        return string.Join("\n", lines
+            .Skip(lastConnect + 1)
+            .Where(l => !l.TrimStart().StartsWith("GRANT", StringComparison.OrdinalIgnoreCase)));
+    }
 
     protected override void ConfigureDatabase(DbContextOptionsBuilder options, string databaseName)
     {

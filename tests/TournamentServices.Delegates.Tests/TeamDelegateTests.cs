@@ -69,6 +69,7 @@ public class TeamDelegateTests
     {
         var team = new TeamBuilder().WithId("team-1").WithName("Nuevo Equipo").Build();
         _repoMock.Setup(r => r.ExistsByNameAsync("Nuevo Equipo")).ReturnsAsync(false);
+        _repoMock.Setup(r => r.AddAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => t);
 
         var result = await _delegate.CreateAsync(team);
 
@@ -82,7 +83,7 @@ public class TeamDelegateTests
         var team = new TeamBuilder().WithId("team-1").WithName("Repetido").Build();
         _repoMock.Setup(r => r.ExistsByNameAsync("Repetido")).ReturnsAsync(true);
 
-        await Assert.ThrowsAsync<DomainValidationException>(() => _delegate.CreateAsync(team));
+        await Assert.ThrowsAsync<DuplicateNameException>(() => _delegate.CreateAsync(team));
         _repoMock.Verify(r => r.AddAsync(It.IsAny<Team>()), Times.Never);
     }
 
@@ -110,14 +111,14 @@ public class TeamDelegateTests
     }
 
     [Fact]
-    public async Task UpdateAsync_LanzaDomainValidationSiNuevoNombreYaExisteEnOtroEquipo()
+    public async Task UpdateAsync_LanzaDuplicateNameSiNuevoNombreYaExisteEnOtroEquipo()
     {
         var existing = new TeamBuilder().WithId("team-1").WithName("Nombre Actual").Build();
         var updated = new TeamBuilder().WithId("team-1").WithName("Nombre De Otro Equipo").Build();
         _repoMock.Setup(r => r.GetByIdAsync("team-1")).ReturnsAsync(existing);
         _repoMock.Setup(r => r.ExistsByNameAsync("Nombre De Otro Equipo")).ReturnsAsync(true);
 
-        await Assert.ThrowsAsync<DomainValidationException>(() => _delegate.UpdateAsync("team-1", updated));
+        await Assert.ThrowsAsync<DuplicateNameException>(() => _delegate.UpdateAsync("team-1", updated));
     }
 
     [Fact]
@@ -125,6 +126,7 @@ public class TeamDelegateTests
     {
         var team = new TeamBuilder().WithId("team-1").WithName("A Borrar").Build();
         _repoMock.Setup(r => r.GetByIdAsync("team-1")).ReturnsAsync(team);
+        _repoMock.Setup(r => r.DeleteAsync("team-1")).ReturnsAsync(true);
 
         await _delegate.DeleteAsync("team-1");
 

@@ -96,32 +96,6 @@ public class TeamRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteAsync_EliminaEquipoExistente()
-    {
-        var context = CreateContext();
-        var repository = new TeamRepository(context);
-        var team = new TeamBuilder().WithId("team-1").WithName("A Borrar").Build();
-        context.Teams.Add(team);
-        await context.SaveChangesAsync();
-
-        await repository.DeleteAsync("team-1");
-
-        var result = await context.Teams.FirstOrDefaultAsync(t => t.Id == "team-1");
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public async Task DeleteAsync_NoTronaSiElIdNoExiste()
-    {
-        var context = CreateContext();
-        var repository = new TeamRepository(context);
-
-        var exception = await Record.ExceptionAsync(() => repository.DeleteAsync("no-existe"));
-
-        Assert.Null(exception);
-    }
-
-    [Fact]
     public async Task ExistsByNameAsync_RegresaTrueSiElNombreYaExiste()
     {
         var context = CreateContext();

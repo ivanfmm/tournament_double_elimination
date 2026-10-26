@@ -15,26 +15,32 @@ namespace TournamentServices.Delegates.Tests;
 public class MatchDelegateTests
 {
     private readonly Mock<IMatchRepository> _repoMock;
-    private readonly Mock<ITeamRepository> _teamRepoMock;
+    private readonly Mock<ITournamentRepository> _tournamentRepoMock;
     private readonly Mock<IGroupRepository> _groupRepoMock;
     private readonly IMatchDelegate _delegate;
 
     public MatchDelegateTests()
     {
         _repoMock = new Mock<IMatchRepository>();
-        _teamRepoMock = new Mock<ITeamRepository>();
+        _tournamentRepoMock = new Mock<ITournamentRepository>();
+
         _groupRepoMock = new Mock<IGroupRepository>();
+
+        // Moq regresa null para Task<IReadOnlyList<T>>; un repo real sin datos regresa lista vacia
+        _groupRepoMock.Setup(r => r.GetByTournamentAsync(It.IsAny<string>())).ReturnsAsync(new List<Group>());
 
         _delegate = new MatchDelegate(
             _repoMock.Object,
-            _teamRepoMock.Object,
+            _tournamentRepoMock.Object,
             _groupRepoMock.Object);
     }
 
-    // Deja listo el caso feliz: un torneo con un grupo que contiene a los
-    // equipos indicados, y esos equipos existiendo en el repo de equipos.
+    // Deja listo el caso feliz: un torneo (round robin) con un grupo que
+    // contiene a los equipos indicados.
     private void GivenTournamentWithGroup(string tournamentId, string groupId, params string[] teamIds)
     {
+        GivenTournament(tournamentId, TournamentType.RoundRobin);
+
         var builder = new GroupBuilder().WithId(groupId).WithTournamentId(tournamentId);
         foreach (var teamId in teamIds)
         {
@@ -45,17 +51,24 @@ public class MatchDelegateTests
             .Setup(r => r.GetByTournamentAsync(tournamentId))
             .ReturnsAsync(new List<Group> { builder.Build() });
 
-        GivenTeamsExist(teamIds);
+        _repoMock.Setup(r => r.AddAsync(It.IsAny<Match>())).ReturnsAsync((Match m) => m);
     }
 
-    private void GivenTeamsExist(params string[] teamIds)
+    private void GivenTournament(string tournamentId, TournamentType type)
     {
-        foreach (var teamId in teamIds)
-        {
-            _teamRepoMock
-                .Setup(r => r.GetByIdAsync(teamId))
-                .ReturnsAsync(new TeamBuilder().WithId(teamId).WithName($"Equipo {teamId}").Build());
-        }
+        var tournament = new TournamentBuilder()
+            .WithId(tournamentId)
+            .WithFormat(new TournamentFormat(maxTeamsPerGroup: 4, numberOfGroups: 2, type: type))
+            .Build();
+
+        _tournamentRepoMock.Setup(r => r.GetByIdAsync(tournamentId)).ReturnsAsync(tournament);
+    }
+
+    private static Match ABracketMatch(string id = "m1")
+    {
+        var match = AMatch(id);
+        match.BracketKey = "wb-r1-m0";
+        return match;
     }
 
     private static Match AMatch(string id = "m1", string tournamentId = "tour-1")
@@ -136,53 +149,74 @@ public class MatchDelegateTests
     }
 
     [Fact]
-    public async Task CreateAsync_WhenTeamDoesNotExist_ThrowsDomainValidationException()
+    public async Task CreateAsync_WhenTournamentDoesNotExist_ThrowsNotFoundException()
     {
-        GivenTournamentWithGroup("tour-1", "g1", "t1", "t2");
-        _teamRepoMock.Setup(r => r.GetByIdAsync("fantasma")).ReturnsAsync((Team?)null);
+        _tournamentRepoMock.Setup(r => r.GetByIdAsync("no-existe")).ReturnsAsync((Tournament?)null);
 
-        await Assert.ThrowsAsync<DomainValidationException>(
-            () => _delegate.CreateAsync("tour-1", "fantasma", "t2", "g1"));
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => _delegate.CreateAsync("no-existe", "t1", "t2"));
 
         _repoMock.Verify(r => r.AddAsync(It.IsAny<Match>()), Times.Never);
     }
 
     [Fact]
-    public async Task CreateAsync_WhenTeamIsNotInTournament_ThrowsDomainValidationException()
+    public async Task CreateAsync_WhenTeamIsNotInGroup_ThrowsBusinessRuleException()
     {
         GivenTournamentWithGroup("tour-1", "g1", "t1", "t2");
-        GivenTeamsExist("t9"); // existe como equipo, pero no esta en ningun grupo del torneo
 
-        await Assert.ThrowsAsync<DomainValidationException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _delegate.CreateAsync("tour-1", "t1", "t9", "g1"));
 
         _repoMock.Verify(r => r.AddAsync(It.IsAny<Match>()), Times.Never);
     }
 
     [Fact]
-    public async Task CreateAsync_WithSameTeamOnBothSides_ThrowsDomainValidationException()
+    public async Task CreateAsync_WithoutGroup_WhenTeamIsNotInTournament_ThrowsBusinessRuleException()
     {
         GivenTournamentWithGroup("tour-1", "g1", "t1", "t2");
 
-        // La validacion la hace el constructor de Match en Domain.
-        await Assert.ThrowsAsync<DomainValidationException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
+            () => _delegate.CreateAsync("tour-1", "t1", "t9"));
+
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<Match>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithSameTeamOnBothSides_ThrowsBusinessRuleException()
+    {
+        GivenTournamentWithGroup("tour-1", "g1", "t1", "t2");
+
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _delegate.CreateAsync("tour-1", "t1", "t1", "g1"));
 
         _repoMock.Verify(r => r.AddAsync(It.IsAny<Match>()), Times.Never);
     }
 
     [Fact]
-    public async Task CreateAsync_WhenGroupIsNotInTournament_ThrowsDomainValidationException()
+    public async Task CreateAsync_WhenGroupIsNotInTournament_ThrowsBusinessRuleException()
     {
         GivenTournamentWithGroup("tour-1", "g1", "t1", "t2");
 
-        await Assert.ThrowsAsync<DomainValidationException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _delegate.CreateAsync("tour-1", "t1", "t2", "grupo-de-otro-torneo"));
     }
 
     [Fact]
-    public async Task CreateAsync_WhenTeamsAreInDifferentGroups_ThrowsDomainValidationException()
+    public async Task CreateAsync_InDoubleEliminationTournament_ThrowsBusinessRuleException()
     {
+        // En doble eliminacion los partidos solo los genera el bracket
+        GivenTournament("tour-1", TournamentType.DoubleElimination);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(
+            () => _delegate.CreateAsync("tour-1", "t1", "t2"));
+
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<Match>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenTeamsAreInDifferentGroups_ThrowsBusinessRuleException()
+    {
+        GivenTournament("tour-1", TournamentType.RoundRobin);
         var groupA = new GroupBuilder().WithId("g1").WithTournamentId("tour-1").WithTeam("t1").Build();
         var groupB = new GroupBuilder().WithId("g2").WithTournamentId("tour-1").WithTeam("t2").Build();
 
@@ -190,9 +224,7 @@ public class MatchDelegateTests
             .Setup(r => r.GetByTournamentAsync("tour-1"))
             .ReturnsAsync(new List<Group> { groupA, groupB });
 
-        GivenTeamsExist("t1", "t2");
-
-        await Assert.ThrowsAsync<DomainValidationException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _delegate.CreateAsync("tour-1", "t1", "t2", "g1"));
 
         _repoMock.Verify(r => r.AddAsync(It.IsAny<Match>()), Times.Never);
@@ -260,12 +292,25 @@ public class MatchDelegateTests
             () => _delegate.UpdateScoreAsync("no-existe", 1, 0));
     }
 
+    [Fact]
+    public async Task UpdateScoreAsync_OnBracketMatch_ThrowsBusinessRuleException()
+    {
+        var match = ABracketMatch();
+        _repoMock.Setup(r => r.GetByIdAsync("m1")).ReturnsAsync(match);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _delegate.UpdateScoreAsync("m1", 1, 0));
+
+        Assert.False(match.IsCompleted);
+        _repoMock.Verify(r => r.UpdateAsync(It.IsAny<Match>()), Times.Never);
+    }
+
     // ---------- DeleteAsync ----------
 
     [Fact]
     public async Task DeleteAsync_WhenMatchExists_CallsRepository()
     {
         _repoMock.Setup(r => r.GetByIdAsync("m1")).ReturnsAsync(AMatch());
+        _repoMock.Setup(r => r.DeleteAsync("m1")).ReturnsAsync(true);
 
         await _delegate.DeleteAsync("m1");
 
@@ -278,6 +323,16 @@ public class MatchDelegateTests
         _repoMock.Setup(r => r.GetByIdAsync("no-existe")).ReturnsAsync((Match?)null);
 
         await Assert.ThrowsAsync<NotFoundException>(() => _delegate.DeleteAsync("no-existe"));
+
+        _repoMock.Verify(r => r.DeleteAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_OnBracketMatch_ThrowsBusinessRuleException()
+    {
+        _repoMock.Setup(r => r.GetByIdAsync("m1")).ReturnsAsync(ABracketMatch());
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _delegate.DeleteAsync("m1"));
 
         _repoMock.Verify(r => r.DeleteAsync(It.IsAny<string>()), Times.Never);
     }

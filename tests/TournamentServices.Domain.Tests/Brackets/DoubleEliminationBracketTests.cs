@@ -62,7 +62,8 @@ public class DoubleEliminationBracketTests
     public void FullPlaythrough_4Teams_WinnersBracketChampionWinsGrandFinal_NoReset()
     {
         // t1 vs t2 -> t1 gana. t3 vs t4 -> t3 gana. WB Final: t1 vs t3 -> t1 gana.
-        // Losers bracket: t2 vs t4 -> t2 gana, pasa a la gran final contra t1.
+        // Losers ronda 1: t2 vs t4 -> t2 gana. Losers final: t2 vs t3 (bajo
+        // de la WB Final) -> t2 gana y pasa a la gran final contra t1.
         // t1 (invicto) gana la gran final: torneo termina SIN reset.
         var bracket = new DoubleEliminationBracket(
             "tournament-1", new List<string> { "t1", "t2", "t3", "t4" }, NoOpSeeder);
@@ -70,11 +71,14 @@ public class DoubleEliminationBracketTests
         PlayByHomeTeamId(bracket, "t1"); // wb-r1-m0: t1 vs t2 -> t1 gana
         PlayByHomeTeamId(bracket, "t3"); // wb-r1-m1: t3 vs t4 -> t3 gana
 
-        Assert.Single(bracket.PendingMatches); // WB Final: t1 vs t3
-        PlayByHomeTeamId(bracket, "t1"); // t1 gana la WB Final
+        // Se pueden jugar en paralelo: WB Final (t1 vs t3) y losers ronda 1 (t2 vs t4)
+        Assert.Equal(2, bracket.PendingMatches.Count);
+        PlayByHomeTeamId(bracket, "t1"); // t1 gana la WB Final, t3 baja al losers
+        PlayByHomeTeamId(bracket, "t2"); // t2 elimina a t4
 
-        Assert.Single(bracket.PendingMatches); // Losers bracket: t2 vs t4
-        PlayByHomeTeamId(bracket, "t2"); // t2 gana, pasa a la gran final
+        var losersFinal = Assert.Single(bracket.PendingMatches);
+        Assert.Contains("t3", new[] { losersFinal.HomeTeamId, losersFinal.VisitorTeamId });
+        PlayByHomeTeamId(bracket, "t2"); // t2 elimina a t3, pasa a la gran final
 
         var grandFinal = Assert.Single(bracket.PendingMatches);
         Assert.Contains("t1", new[] { grandFinal.HomeTeamId, grandFinal.VisitorTeamId });
@@ -96,7 +100,8 @@ public class DoubleEliminationBracketTests
         PlayByHomeTeamId(bracket, "t1"); // t1 gana a t2
         PlayByHomeTeamId(bracket, "t3"); // t3 gana a t4
         PlayByHomeTeamId(bracket, "t1"); // WB Final: t1 gana a t3
-        PlayByHomeTeamId(bracket, "t2"); // Losers: t2 gana a t4
+        PlayByHomeTeamId(bracket, "t2"); // Losers ronda 1: t2 gana a t4
+        PlayByHomeTeamId(bracket, "t2"); // Losers final: t2 gana a t3
 
         var grandFinal = bracket.PendingMatches[0];
         var loserSideChampion = grandFinal.HomeTeamId == "t1" ? grandFinal.VisitorTeamId : grandFinal.HomeTeamId;
@@ -194,6 +199,39 @@ public class DoubleEliminationBracketTests
         }
 
         Assert.True(checkedLosersFinal);
+    }
+
+    [Fact]
+    public void Replay_WithSameResultsInSameOrder_RebuildsSameBracket()
+    {
+        // Juega parte del torneo, guarda los resultados en orden y reconstruye.
+        var teams = Enumerable.Range(1, 6).Select(i => $"t{i}").ToList();
+        var original = new DoubleEliminationBracket("tournament-1", teams, NoOpSeeder);
+        var results = new List<(string, Winner)>();
+
+        for (var i = 0; i < 5; i++)
+        {
+            var match = original.PendingMatches[^1];
+            var winner = i % 2 == 0 ? Winner.Home : Winner.Visitor;
+            original.ReportResult(match.Id, winner);
+            results.Add((match.Id, winner));
+        }
+
+        var rebuilt = DoubleEliminationBracket.Replay("tournament-1", teams, results);
+
+        Assert.Equal(
+            original.PendingMatches.Select(m => (m.Id, m.HomeTeamId, m.VisitorTeamId)),
+            rebuilt.PendingMatches.Select(m => (m.Id, m.HomeTeamId, m.VisitorTeamId)));
+    }
+
+    [Fact]
+    public void Replay_DoesNotShuffleSeededTeams()
+    {
+        var bracket = DoubleEliminationBracket.Replay(
+            "tournament-1", new List<string> { "t4", "t3", "t2", "t1" }, Array.Empty<(string, Winner)>());
+
+        Assert.Equal("t4", bracket.PendingMatches[0].HomeTeamId);
+        Assert.Equal("t3", bracket.PendingMatches[0].VisitorTeamId);
     }
 
     private static void PlayByHomeTeamId(DoubleEliminationBracket bracket, string expectedWinnerTeamId)

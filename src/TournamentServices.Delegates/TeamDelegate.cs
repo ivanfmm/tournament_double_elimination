@@ -20,7 +20,7 @@ public class TeamDelegate(ITeamRepository teamRepository) : ITeamDelegate
         }
         if (await teamRepository.ExistsByNameAsync(team.Name))
         {
-            throw new BusinessRuleException($"Ya existe un equipo con el nombre '{team.Name}'.");
+            throw new DuplicateNameException($"Ya existe un equipo con el nombre '{team.Name}'.");
         }
         team.Id = Guid.NewGuid().ToString();
         return await teamRepository.AddAsync(team);
@@ -38,7 +38,7 @@ public class TeamDelegate(ITeamRepository teamRepository) : ITeamDelegate
         var nameChanged = !string.Equals(existing.Name, team.Name, StringComparison.OrdinalIgnoreCase);
         if (nameChanged && await teamRepository.ExistsByNameAsync(team.Name))
         {
-            throw new BusinessRuleException($"Ya existe un equipo con el nombre '{team.Name}'.");
+            throw new DuplicateNameException($"Ya existe un equipo con el nombre '{team.Name}'.");
         }
         existing.Name = team.Name;
         await teamRepository.UpdateAsync(existing);
