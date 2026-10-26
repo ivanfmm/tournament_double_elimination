@@ -1,3 +1,4 @@
+using TournamentServices.Repositories;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TournamentServices.Api.Extensions;
@@ -16,7 +17,10 @@ builder.Services.ConfigureHttpJsonOptions(options =>
         new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper)));
 
 var app = builder.Build();
-
+   app.MapGet("/health/ready", async (TournamentDbContext db) =>
+       await db.Database.CanConnectAsync()
+           ? Results.Ok("Ready")
+           : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
 app.UseExceptionHandler();
 
 app.MapGet("/health", () => "Services running");
