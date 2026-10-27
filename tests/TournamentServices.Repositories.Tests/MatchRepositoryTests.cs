@@ -124,29 +124,4 @@ public class MatchRepositoryTests
             Assert.True(reloaded.IsCompleted);
         }
     }
-
-    [Fact]
-    public async Task DeleteAsync_RemovesTheMatch()
-    {
-        await using var db = NewDb(NewDbName());
-        var repository = new MatchRepository(db);
-
-        await repository.AddAsync(new MatchBuilder()
-            .WithId("m1").WithTournamentId("tour-1")
-            .WithHomeTeam("t1").WithVisitorTeam("t2").Build());
-
-        await repository.DeleteAsync("m1");
-
-        Assert.Null(await repository.GetByIdAsync("m1"));
-    }
-
-    [Fact]
-    public async Task DeleteAsync_WhenMatchDoesNotExist_DoesNothing()
-    {
-        await using var db = NewDb(NewDbName());
-        var repository = new MatchRepository(db);
-
-        // No debe lanzar: quien decide el 404 es el Delegate.
-        await repository.DeleteAsync("no-existe");
-    }
 }

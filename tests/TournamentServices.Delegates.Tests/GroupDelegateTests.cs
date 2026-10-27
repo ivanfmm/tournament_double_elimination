@@ -20,6 +20,9 @@ public class GroupDelegateTests
         _tournamentRepoMock = new Mock<ITournamentRepository>();
         _teamRepoMock = new Mock<ITeamRepository>();
 
+        // Moq regresa null para Task<IReadOnlyList<T>>; un repo real sin datos regresa lista vacia
+        _groupRepoMock.Setup(r => r.GetByTournamentAsync(It.IsAny<string>())).ReturnsAsync(new List<Group>());
+
         _delegate = new GroupDelegate(
             _groupRepoMock.Object,
             _tournamentRepoMock.Object,
@@ -35,6 +38,20 @@ public class GroupDelegateTests
     private void SetupGroup(Group group)
     {
         _groupRepoMock.Setup(r => r.GetByIdAsync(group.Id)).ReturnsAsync(group);
+    }
+
+    // El delegate consulta los grupos actuales al repo, no a Tournament.Groups
+    private void SetupTournamentGroups(string tournamentId, params Group[] groups)
+    {
+        _groupRepoMock.Setup(r => r.GetByTournamentAsync(tournamentId)).ReturnsAsync(groups.ToList());
+    }
+
+    private static Tournament AStartedTournament(string id)
+    {
+        var format = new TournamentFormat(maxTeamsPerGroup: 4, numberOfGroups: 2, type: TournamentType.DoubleElimination);
+        var tournament = new TournamentBuilder().WithId(id).WithFormat(format).Build();
+        tournament.Start(new[] { "team-1", "team-2" });
+        return tournament;
     }
 
     private void SetupTeam(string teamId)
@@ -119,6 +136,7 @@ public class GroupDelegateTests
     public async Task CreateAsync_GeneraIdYGuarda()
     {
         SetupTournament(new TournamentBuilder().WithId("t-1").Build());
+        _groupRepoMock.Setup(r => r.AddAsync(It.IsAny<Group>())).ReturnsAsync((Group g) => g);
 
         var result = await _delegate.CreateAsync("t-1", "Grupo A");
 
@@ -138,23 +156,34 @@ public class GroupDelegateTests
     }
 
     [Fact]
-    public async Task CreateAsync_LanzaDomainValidationSiElNombreSeRepite()
+    public async Task CreateAsync_LanzaBusinessRuleSiElNombreSeRepite()
     {
-        var existing = new GroupBuilder().WithId("g-1").WithTournamentId("t-1").WithName("Grupo A").Build();
-        SetupTournament(new TournamentBuilder().WithId("t-1").WithGroup(existing).Build());
+        SetupTournament(new TournamentBuilder().WithId("t-1").Build());
+        _groupRepoMock.Setup(r => r.ExistsByNameInTournamentAsync("t-1", "grupo a")).ReturnsAsync(true);
 
-        await Assert.ThrowsAsync<DomainValidationException>(() => _delegate.CreateAsync("t-1", "grupo a"));
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _delegate.CreateAsync("t-1", "grupo a"));
         _groupRepoMock.Verify(r => r.AddAsync(It.IsAny<Group>()), Times.Never);
     }
 
     [Fact]
-    public async Task CreateAsync_LanzaDomainValidationSiYaNoCabenGrupos()
+    public async Task CreateAsync_LanzaBusinessRuleSiYaNoCabenGrupos()
     {
         var format = new TournamentFormat(maxTeamsPerGroup: 4, numberOfGroups: 1, type: TournamentType.RoundRobin);
         var existing = new GroupBuilder().WithId("g-1").WithTournamentId("t-1").WithName("Grupo A").Build();
-        SetupTournament(new TournamentBuilder().WithId("t-1").WithFormat(format).WithGroup(existing).Build());
+        SetupTournament(new TournamentBuilder().WithId("t-1").WithFormat(format).Build());
+        SetupTournamentGroups("t-1", existing);
 
-        await Assert.ThrowsAsync<DomainValidationException>(() => _delegate.CreateAsync("t-1", "Grupo B"));
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _delegate.CreateAsync("t-1", "Grupo B"));
+        _groupRepoMock.Verify(r => r.AddAsync(It.IsAny<Group>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_LanzaBusinessRuleSiElTorneoYaInicio()
+    {
+        SetupTournament(AStartedTournament("t-1"));
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _delegate.CreateAsync("t-1", "Grupo C"));
+        _groupRepoMock.Verify(r => r.AddAsync(It.IsAny<Group>()), Times.Never);
     }
 
     // ---------- UpdateAsync ----------
@@ -183,12 +212,12 @@ public class GroupDelegateTests
     }
 
     [Fact]
-    public async Task UpdateAsync_LanzaDomainValidationSiOtroGrupoYaUsaElNombre()
+    public async Task UpdateAsync_LanzaBusinessRuleSiOtroGrupoYaUsaElNombre()
     {
         SetupGroup(new GroupBuilder().WithId("g-1").WithTournamentId("t-1").WithName("Grupo A").Build());
         _groupRepoMock.Setup(r => r.ExistsByNameInTournamentAsync("t-1", "Grupo B")).ReturnsAsync(true);
 
-        await Assert.ThrowsAsync<DomainValidationException>(() => _delegate.UpdateAsync("t-1", "g-1", "Grupo B"));
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _delegate.UpdateAsync("t-1", "g-1", "Grupo B"));
         _groupRepoMock.Verify(r => r.UpdateAsync(It.IsAny<Group>()), Times.Never);
     }
 
@@ -206,6 +235,7 @@ public class GroupDelegateTests
     public async Task DeleteAsync_EliminaGrupo()
     {
         SetupGroup(new GroupBuilder().WithId("g-1").WithTournamentId("t-1").WithTeam("team-1").Build());
+        _groupRepoMock.Setup(r => r.DeleteAsync("g-1")).ReturnsAsync(true);
 
         await _delegate.DeleteAsync("t-1", "g-1");
 
@@ -258,45 +288,46 @@ public class GroupDelegateTests
     }
 
     [Fact]
-    public async Task AssignTeamsAsync_LanzaDomainValidationSiUnEquipoNoExiste()
+    public async Task AssignTeamsAsync_LanzaBusinessRuleSiUnEquipoNoExiste()
     {
         var group = new GroupBuilder().WithId("g-1").WithTournamentId("t-1").Build();
         SetupTournament(new TournamentBuilder().WithId("t-1").WithGroup(group).Build());
         SetupGroup(group);
         _teamRepoMock.Setup(r => r.GetByIdAsync("fantasma")).ReturnsAsync((Team?)null);
 
-        await Assert.ThrowsAsync<DomainValidationException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _delegate.AssignTeamsAsync("t-1", "g-1", new[] { "fantasma" }));
         _groupRepoMock.Verify(r => r.UpdateAsync(It.IsAny<Group>()), Times.Never);
     }
 
     [Fact]
-    public async Task AssignTeamsAsync_LanzaDomainValidationSiHayIdsRepetidos()
+    public async Task AssignTeamsAsync_LanzaBusinessRuleSiHayIdsRepetidos()
     {
         var group = new GroupBuilder().WithId("g-1").WithTournamentId("t-1").Build();
         SetupTournament(new TournamentBuilder().WithId("t-1").WithGroup(group).Build());
         SetupGroup(group);
         SetupTeam("team-1");
 
-        await Assert.ThrowsAsync<DomainValidationException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _delegate.AssignTeamsAsync("t-1", "g-1", new[] { "team-1", "team-1" }));
     }
 
     [Fact]
-    public async Task AssignTeamsAsync_LanzaDomainValidationSiElEquipoYaEstaEnOtroGrupoDelTorneo()
+    public async Task AssignTeamsAsync_LanzaBusinessRuleSiElEquipoYaEstaEnOtroGrupoDelTorneo()
     {
         var target = new GroupBuilder().WithId("g-1").WithTournamentId("t-1").WithName("A").Build();
         var other = new GroupBuilder().WithId("g-2").WithTournamentId("t-1").WithName("B").WithTeam("team-1").Build();
         SetupTournament(new TournamentBuilder().WithId("t-1").WithGroup(target).WithGroup(other).Build());
         SetupGroup(target);
+        SetupTournamentGroups("t-1", target, other);
         SetupTeam("team-1");
 
-        await Assert.ThrowsAsync<DomainValidationException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _delegate.AssignTeamsAsync("t-1", "g-1", new[] { "team-1" }));
     }
 
     [Fact]
-    public async Task AssignTeamsAsync_LanzaDomainValidationSiSeExcedeMaxTeamsPerGroup()
+    public async Task AssignTeamsAsync_LanzaBusinessRuleSiSeExcedeMaxTeamsPerGroup()
     {
         var format = new TournamentFormat(maxTeamsPerGroup: 2, numberOfGroups: 2, type: TournamentType.RoundRobin);
         var group = new GroupBuilder().WithId("g-1").WithTournamentId("t-1").WithTeam("team-1").Build();
@@ -305,7 +336,7 @@ public class GroupDelegateTests
         SetupTeam("team-2");
         SetupTeam("team-3");
 
-        await Assert.ThrowsAsync<DomainValidationException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _delegate.AssignTeamsAsync("t-1", "g-1", new[] { "team-2", "team-3" }));
         Assert.Single(group.TeamIds);
     }
@@ -319,5 +350,18 @@ public class GroupDelegateTests
 
         await Assert.ThrowsAsync<DomainValidationException>(
             () => _delegate.AssignTeamsAsync("t-1", "g-1", Array.Empty<string>()));
+    }
+
+    [Fact]
+    public async Task AssignTeamsAsync_LanzaBusinessRuleSiElTorneoYaInicio()
+    {
+        var group = new GroupBuilder().WithId("g-1").WithTournamentId("t-1").Build();
+        SetupTournament(AStartedTournament("t-1"));
+        SetupGroup(group);
+        SetupTeam("team-3");
+
+        await Assert.ThrowsAsync<BusinessRuleException>(
+            () => _delegate.AssignTeamsAsync("t-1", "g-1", new[] { "team-3" }));
+        _groupRepoMock.Verify(r => r.UpdateAsync(It.IsAny<Group>()), Times.Never);
     }
 }

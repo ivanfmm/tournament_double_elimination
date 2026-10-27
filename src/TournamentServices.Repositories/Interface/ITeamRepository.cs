@@ -2,12 +2,9 @@ using TournamentServices.Domain;
 
 namespace TournamentServices.Repositories;
 
-public interface ITeamRepository
+
+public interface ITeamRepository : IRepository<Team>
 {
-    Task<Team?> GetByIdAsync(string id);
     Task<List<Team>> GetAllAsync();
-    Task AddAsync(Team team);
-    Task UpdateAsync(Team team);
-    Task DeleteAsync(string id);
     Task<bool> ExistsByNameAsync(string name);
 }

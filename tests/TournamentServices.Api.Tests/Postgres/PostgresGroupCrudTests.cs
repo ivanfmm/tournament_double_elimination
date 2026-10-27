@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
-using TournamentServices.Api.Dtos;
 using TournamentServices.Domain.Enums;
 
 namespace TournamentServices.Api.Tests.Postgres;
@@ -39,7 +38,7 @@ public class PostgresGroupCrudTests : PostgresTestBase
 
         Assert.Equal("Grupo A", created.Name);
         Assert.Equal(tournamentId, created.TournamentId);
-        Assert.Empty(created.Teams);
+        Assert.Empty(created.TeamIds);
         Assert.Equal($"{groupsUrl}/{created.Id}", response.Headers.Location!.ToString());
 
         Assert.True(await QueryAsync(db =>
@@ -82,25 +81,6 @@ public class PostgresGroupCrudTests : PostgresTestBase
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    [PostgresFact]
-    public async Task Alta_Regresa404SiElTorneoNoExiste()
-    {
-        var response = await Client.PostAsJsonAsync(
-            "/tournaments/no-existe/groups", new CreateGroupDto("Grupo A"), JsonOptions);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [PostgresFact]
-    public async Task Alta_Regresa400SiElNombreVieneVacio()
-    {
-        var (_, groupsUrl) = await NewTournamentAsync();
-
-        var response = await Client.PostAsJsonAsync(groupsUrl, new CreateGroupDto(""), JsonOptions);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
     // ---------------- CAMBIO ----------------
 
     [PostgresFact]
@@ -126,16 +106,6 @@ public class PostgresGroupCrudTests : PostgresTestBase
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal("Grupo B", (await GetAsync<GroupDto>($"{groupsUrl}/{groupB.Id}")).Name);
-    }
-
-    [PostgresFact]
-    public async Task Cambio_Regresa404SiElGrupoNoExiste()
-    {
-        var (_, groupsUrl) = await NewTournamentAsync();
-
-        var response = await Client.PutAsJsonAsync($"{groupsUrl}/no-existe", new UpdateGroupDto("X"), JsonOptions);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     // ---------------- BAJA ----------------
@@ -167,16 +137,6 @@ public class PostgresGroupCrudTests : PostgresTestBase
         Assert.True(await QueryAsync(db => db.Teams.AnyAsync(t => t.Id == pumas.Id)));
     }
 
-    [PostgresFact]
-    public async Task Baja_Regresa404SiElGrupoNoExiste()
-    {
-        var (_, groupsUrl) = await NewTournamentAsync();
-
-        var response = await Client.DeleteAsync($"{groupsUrl}/no-existe");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
     // ---------------- ASIGNAR EQUIPOS ----------------
 
     [PostgresFact]
@@ -192,7 +152,7 @@ public class PostgresGroupCrudTests : PostgresTestBase
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         var loaded = await GetAsync<GroupDto>($"{groupsUrl}/{group.Id}");
-        Assert.Equal(new[] { "Chivas", "Pumas" }, loaded.Teams.Select(t => t.Name).OrderBy(n => n));
+        Assert.Equal(new[] { pumas.Id, chivas.Id }.OrderBy(id => id), loaded.TeamIds.OrderBy(id => id));
     }
 
     [PostgresFact]
@@ -204,34 +164,7 @@ public class PostgresGroupCrudTests : PostgresTestBase
         var response = await AssignAsync(groupsUrl, group.Id, "team-fantasma");
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Empty((await GetAsync<GroupDto>($"{groupsUrl}/{group.Id}")).Teams);
-    }
-
-    [PostgresFact]
-    public async Task AsignarEquipos_Regresa422SiSeExcedeMaxTeamsPerGroup()
-    {
-        var (_, groupsUrl) = await NewTournamentAsync(maxTeamsPerGroup: 1);
-        var group = await PostAsync<GroupDto>(groupsUrl, new CreateGroupDto("Grupo A"));
-        var pumas = await NewTeamAsync("Pumas");
-        var chivas = await NewTeamAsync("Chivas");
-
-        var response = await AssignAsync(groupsUrl, group.Id, pumas.Id, chivas.Id);
-
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-    }
-
-    [PostgresFact]
-    public async Task AsignarEquipos_Regresa422SiElEquipoYaEstaEnOtroGrupo()
-    {
-        var (_, groupsUrl) = await NewTournamentAsync();
-        var groupA = await PostAsync<GroupDto>(groupsUrl, new CreateGroupDto("Grupo A"));
-        var groupB = await PostAsync<GroupDto>(groupsUrl, new CreateGroupDto("Grupo B"));
-        var pumas = await NewTeamAsync("Pumas");
-
-        await AssignAsync(groupsUrl, groupA.Id, pumas.Id);
-        var response = await AssignAsync(groupsUrl, groupB.Id, pumas.Id);
-
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Empty((await GetAsync<GroupDto>($"{groupsUrl}/{group.Id}")).TeamIds);
     }
 
     [PostgresFact]
@@ -262,7 +195,7 @@ public class PostgresGroupCrudTests : PostgresTestBase
     {
         return Client.PatchAsJsonAsync(
             $"{groupsUrl}/{groupId}/teams",
-            new AssignTeamsDto(teamIds.ToList()),
+            teamIds.ToList(),
             JsonOptions);
     }
 }

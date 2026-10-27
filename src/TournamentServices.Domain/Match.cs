@@ -9,6 +9,12 @@ public class Match
     public string Id { get; set; } = string.Empty;
     public string TournamentId { get; set; } = string.Empty;
     public string? GroupId { get; set; }
+
+    // Llave interna del bracket (ej. "wb-r1-m0"); null si el partido se creo a mano
+    public string? BracketKey { get; set; }
+
+    // Orden en que se reporto el resultado; el bracket se reconstruye en este orden
+    public int? ResultOrder { get; set; }
     
     public string HomeTeamId
     {

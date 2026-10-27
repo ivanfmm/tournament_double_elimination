@@ -1,83 +1,129 @@
-using TournamentServices.Domain;
 using TournamentServices.Domain.Exceptions;
+using TournamentServices.Domain;
+using TournamentServices.Domain.Enums;
 using TournamentServices.Repositories;
 
 namespace TournamentServices.Delegates;
 
-public class TournamentDelegate : ITournamentDelegate
+public class TournamentDelegate(ITournamentRepository tournamentRepository, IGroupRepository groupRepository, IMatchRepository matchRepository) : ITournamentDelegate
 {
-    private readonly ITournamentRepository _repository;
-
-    public TournamentDelegate(ITournamentRepository repository)
-    {
-        _repository = repository;
-    }
-
     public async Task<Tournament> GetByIdAsync(string id)
-    {
-        var tournament = await _repository.GetByIdAsync(id);
-
-        if (tournament is null)
-        {
-            throw new NotFoundException($"No existe un torneo con id '{id}'.");
-        }
-
-        return tournament;
-    }
+        => await tournamentRepository.GetByIdWithDetailsAsync(id)
+           ?? throw new NotFoundException($"Torneo '{id}' no encontrado.");
 
     public Task<IReadOnlyList<Tournament>> GetAllAsync()
-    {
-        return _repository.GetAllAsync();
-    }
+        => tournamentRepository.GetAllAsync();
 
-    public Task<Tournament> CreateAsync(Tournament tournament)
+    public async Task<Tournament> CreateAsync(Tournament tournament)
     {
-        return _repository.AddAsync(tournament);
+        EnsureNameAndFormat(tournament);
+
+        if (await tournamentRepository.ExistsByNameAsync(tournament.Name))
+        {
+            throw new DuplicateNameException($"Ya existe un torneo con el nombre '{tournament.Name}'.");
+        }
+
+        tournament.Id = Guid.NewGuid().ToString();
+
+        tournament.Groups.Clear();
+        tournament.Matches.Clear();
+
+        return await tournamentRepository.AddAsync(tournament);
     }
 
     public async Task<Tournament> UpdateAsync(Tournament tournament)
     {
-        var existing = await _repository.GetByIdAsync(tournament.Id);
+        var existing = await GetByIdAsync(tournament.Id);
 
-        if (existing is null)
+        EnsureNameAndFormat(tournament);
+        if (existing.Format != tournament.Format) EnsureNotStarted(existing);
+        EnsureFormatFitsExistingGroups(existing, tournament.Format);
+
+        if (existing.Name != tournament.Name && await tournamentRepository.ExistsByNameAsync(tournament.Name))
         {
-            throw new NotFoundException($"No existe un torneo con id '{tournament.Id}'.");
+            throw new DuplicateNameException($"Ya existe un torneo con el nombre '{tournament.Name}'.");
         }
 
-        await _repository.UpdateAsync(tournament);
-        return tournament;
+        existing.Name = tournament.Name;
+        existing.Format = tournament.Format;
+
+        await tournamentRepository.UpdateAsync(existing);
+        return existing;
     }
 
     public async Task<Tournament> PatchAsync(string id, TournamentPatch patch)
     {
-        var tournament = await _repository.GetByIdAsync(id);
+        var existing = await GetByIdAsync(id);
 
-        if (tournament is null)
+        var newName = patch.Name is null ? existing.Name : new Tournament { Name = patch.Name }.Name;
+
+        var newFormat = existing.Format;
+        if (patch.HasFormatChanges)
         {
-            throw new NotFoundException($"No existe un torneo con id '{id}'.");
+            EnsureNotStarted(existing);
+            newFormat = new TournamentFormat(patch.MaxTeamsPerGroup ?? existing.Format.MaxTeamsPerGroup, patch.NumberOfGroups ?? existing.Format.NumberOfGroups, patch.Type ?? existing.Format.Type);
+            EnsureFormatFitsExistingGroups(existing, newFormat);
         }
 
-        if (patch.Name is not null)
-        {
-            tournament.Name = patch.Name;
-        }
+        existing.Name = newName;
+        existing.Format = newFormat;
 
-        if (patch.Format is not null)
-        {
-            tournament.Format = patch.Format;
-        }
-
-        await _repository.UpdateAsync(tournament);
-        return tournament;
+        await tournamentRepository.UpdateAsync(existing);
+        return existing;
     }
 
     public async Task DeleteAsync(string id)
     {
-        var deleted = await _repository.DeleteAsync(id);
+        await GetByIdAsync(id);
 
+        var groups = await groupRepository.GetByTournamentAsync(id);
+        foreach (var group in groups)
+        {
+            await groupRepository.DeleteAsync(group.Id);
+        }
+
+        var matches = await matchRepository.GetByTournamentAsync(id);
+        foreach (var match in matches)
+        {
+            await matchRepository.DeleteAsync(match.Id);
+        }
+
+        var deleted = await tournamentRepository.DeleteAsync(id);
         if (!deleted)
         {
-            throw new NotFoundException($"No existe un torneo con id '{id}'.");
+            throw new NotFoundException($"Torneo '{id}' no encontrado.");
+        }
+    }
+
+    // El formato no puede cambiar una vez iniciado el torneo
+    private static void EnsureNotStarted(Tournament tournament)
+    {
+        if (tournament.Status != TournamentStatus.Created)
+        {
+            throw new BusinessRuleException("El torneo ya inició; no se puede cambiar el formato.");
+        }
+    }
+
+    private static void EnsureNameAndFormat(Tournament tournament)
+    {
+        if (string.IsNullOrWhiteSpace(tournament.Name))
+            throw new DomainValidationException("El nombre del torneo no puede estar vacío.");
+
+        if (tournament.Format is null)
+            throw new DomainValidationException("El formato del torneo es requerido.");
+    }
+
+    private static void EnsureFormatFitsExistingGroups(Tournament existing, TournamentFormat format)
+    {
+        if (existing.Groups.Count > format.NumberOfGroups)
+        {
+            throw new BusinessRuleException($"El torneo ya tiene {existing.Groups.Count} grupos; no se puede reducir a {format.NumberOfGroups}.");
+        }
+
+        var biggest = existing.Groups.Count == 0 ? 0 : existing.Groups.Max(g => g.TeamIds.Count);
+        if (biggest > format.MaxTeamsPerGroup)
+        {
+             throw new BusinessRuleException($"Hay un grupo con {biggest} equipos; no se puede reducir el máximo a {format.MaxTeamsPerGroup}.");
         }
     }
 }

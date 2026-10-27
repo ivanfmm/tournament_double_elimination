@@ -12,6 +12,7 @@ public class TournamentDbContext : DbContext
     public DbSet<Group> Groups => Set<Group>();
     public DbSet<Match> Matches => Set<Match>();
     public DbSet<Tournament> Tournaments => Set<Tournament>();
+    internal DbSet<GroupTeam> GroupTeams => Set<GroupTeam>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -19,96 +20,49 @@ public class TournamentDbContext : DbContext
         ConfigureGroup(modelBuilder);
         ConfigureMatch(modelBuilder);
         ConfigureTournament(modelBuilder);
+        ConfigureGroupTeam(modelBuilder);
+
+        ConfigureSoftDelete<Team>(modelBuilder);
+        ConfigureSoftDelete<Group>(modelBuilder);
+        ConfigureSoftDelete<Match>(modelBuilder);
+        ConfigureSoftDelete<Tournament>(modelBuilder);
     }
 
     private static void ConfigureTeam(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Team>(b =>
         {
-            b.ToTable("Teams");
+            b.ToTable("teams");
             b.HasKey(t => t.Id);
-            b.Property(t => t.Name).IsRequired();
+            b.Property(t => t.Id).HasColumnName("id");
+            b.Property(t => t.Name).HasColumnName("name").IsRequired();
+            b.HasIndex(t => t.Name).IsUnique().HasFilter("deleted_at IS NULL");
         });
     }
 
-    private static void ConfigureGroup(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<Group>(b =>
-        {
-            b.ToTable("Groups");
-            b.HasKey(g => g.Id);
-            b.Property(g => g.Name).IsRequired();
-            b.Property(g => g.TournamentId).IsRequired();
-
-            // TeamIds es la vista de solo lectura de _teamIds. Se ignora para
-            // que EF no intente mapear la misma lista dos veces.
-            b.Ignore(g => g.TeamIds);
-
-            b.Property<List<string>>("_teamIds")
-                .HasColumnName("TeamIds")
-                .HasConversion(
-                    teamIds => JsonSerializer.Serialize(teamIds, (JsonSerializerOptions?)null),
-                    json => JsonSerializer.Deserialize<List<string>>(json, (JsonSerializerOptions?)null)
-                            ?? new List<string>())
-                .Metadata.SetPropertyAccessMode(PropertyAccessMode.Field);
-        });
-    }
-
-    private static void ConfigureMatch(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<Match>(b =>
-        {
-            b.ToTable("Matches");
-            b.HasKey(m => m.Id);
-            b.Property(m => m.TournamentId).IsRequired();
-            b.Property(m => m.GroupId);
-
-            b.Property(m => m.HomeTeamId)
-                .HasColumnName("HomeTeamId")
-                .IsRequired()
-                .UsePropertyAccessMode(PropertyAccessMode.Field);
-
-            b.Property(m => m.VisitorTeamId)
-                .HasColumnName("VisitorTeamId")
-                .IsRequired()
-                .UsePropertyAccessMode(PropertyAccessMode.Field);
-            // Score es un value object embebido (owned type): sus dos
-            // enteros se guardan como columnas normales DENTRO de la
-            // misma tabla Matches, no en una tabla separada.
-            b.OwnsOne(m => m.Score, score =>
-            {
-                score.Property(s => s.HomeTeamScore).HasColumnName("HomeTeamScore");
-                score.Property(s => s.VisitorTeamScore).HasColumnName("VisitorTeamScore");
-            });
-
-            b.Property(m => m.Winner).HasConversion<string>();
-            b.Property(m => m.IsCompleted);
-
-            // GroupId es opcional: si se borra el Group, el match NO se
-            // borra, solo pierde la referencia (a diferencia de borrar
-            // el Tournament completo, que sí hace cascada — ver abajo).
-            b.HasOne<Group>()
-                .WithMany()
-                .HasForeignKey(m => m.GroupId)
-                .OnDelete(DeleteBehavior.SetNull);
-        });
-    }
-
-    private static void ConfigureTournament(ModelBuilder modelBuilder)
+       private static void ConfigureTournament(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Tournament>(b =>
         {
-            b.ToTable("Tournaments");
+            b.ToTable("tournaments");
             b.HasKey(t => t.Id);
-            b.Property(t => t.Name).IsRequired();
 
-            b.OwnsOne(t => t.Format, format =>
+            b.Property(t => t.Id).HasColumnName("id");
+            b.Property(t => t.Name).HasColumnName("name").IsRequired();
+            b.HasIndex(t => t.Name).IsUnique().HasFilter("deleted_at IS NULL");
+
+            b.OwnsOne(t => t.Format, f =>
             {
-                format.Property(f => f.MaxTeamsPerGroup).HasColumnName("MaxTeamsPerGroup");
-                format.Property(f => f.NumberOfGroups).HasColumnName("NumberOfGroups");
-                format.Property(f => f.Type).HasColumnName("FormatType").HasConversion<string>();
+                f.Property(x => x.MaxTeamsPerGroup).HasColumnName("max_teams_per_group");
+                f.Property(x => x.NumberOfGroups).HasColumnName("number_of_groups");
+                f.Property(x => x.Type).HasColumnName("format_type").HasConversion<string>();
             });
+            b.Navigation(t => t.Format).IsRequired();
 
+            b.Property(t => t.Status).HasColumnName("status").HasConversion<string>();
+            b.Property(t => t.ChampionTeamId).HasColumnName("champion_team_id");
+            b.Property(t => t.SeededTeamIds).HasColumnName("seeded_team_ids");
+            
             b.Ignore(t => t.Groups);
             b.Ignore(t => t.Matches);
 
@@ -122,5 +76,81 @@ public class TournamentDbContext : DbContext
                 .HasForeignKey(m => m.TournamentId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+    }
+
+    private static void ConfigureGroup(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Group>(b =>
+        {
+            b.ToTable("groups");
+            b.HasKey(g => g.Id);
+            b.Property(g => g.Id).HasColumnName("id");
+            b.Property(g => g.Name).HasColumnName("name").IsRequired();
+            b.Property(g => g.TournamentId).HasColumnName("tournament_id").IsRequired();
+            b.HasIndex(g => new { g.TournamentId, g.Name }).IsUnique().HasFilter("deleted_at IS NULL");
+
+            b.Ignore(g => g.TeamIds);
+        });
+    }
+
+    private static void ConfigureMatch(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Match>(b =>
+        {
+            b.ToTable("matches");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.Id).HasColumnName("id");
+            b.Property(m => m.TournamentId).HasColumnName("tournament_id").IsRequired();
+            b.Property(m => m.GroupId).HasColumnName("group_id");
+
+            b.Property(m => m.HomeTeamId)
+                .HasColumnName("home_team_id")
+                .IsRequired()
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            b.Property(m => m.VisitorTeamId)
+                .HasColumnName("visitor_team_id")
+                .IsRequired()
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            b.OwnsOne(m => m.Score, score =>
+            {
+                score.Property(s => s.HomeTeamScore).HasColumnName("home_team_score");
+                score.Property(s => s.VisitorTeamScore).HasColumnName("visitor_team_score");
+            });
+
+            b.Property(m => m.Winner).HasColumnName("winner").HasConversion<string>();
+            b.Property(m => m.IsCompleted).HasColumnName("is_completed");
+            b.Property(m => m.BracketKey).HasColumnName("bracket_key");
+            b.Property(m => m.ResultOrder).HasColumnName("result_order");
+            b.HasIndex(m => new { m.TournamentId, m.BracketKey })
+                .IsUnique()
+                .HasFilter("bracket_key IS NOT NULL AND deleted_at IS NULL");
+            b.HasIndex(m => new { m.TournamentId, m.ResultOrder })
+                .IsUnique()
+                .HasFilter("result_order IS NOT NULL AND deleted_at IS NULL");
+
+            b.HasOne<Group>()
+                .WithMany()
+                .HasForeignKey(m => m.GroupId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private static void ConfigureGroupTeam(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<GroupTeam>(b =>
+        {
+            b.ToTable("group_teams");
+            b.HasKey(gt => new { gt.GroupId, gt.TeamId });
+            b.Property(gt => gt.GroupId).HasColumnName("group_id");
+            b.Property(gt => gt.TeamId).HasColumnName("team_id");
+        });
+    }
+
+    private static void ConfigureSoftDelete<T>(ModelBuilder modelBuilder) where T : class
+    {
+        modelBuilder.Entity<T>().Property<DateTime?>("deleted_at");
+        modelBuilder.Entity<T>().HasQueryFilter(e => EF.Property<DateTime?>(e, "deleted_at") == null);
     }
 }

@@ -1,11 +1,9 @@
 using TournamentServices.Domain;
 namespace TournamentServices.Repositories;
 
-public interface ITournamentRepository
+public interface ITournamentRepository : IRepository<Tournament>
 {
-    Task<Tournament?> GetByIdAsync(string id);
     Task<IReadOnlyList<Tournament>> GetAllAsync();
-    Task<Tournament> AddAsync(Tournament tournament);
-    Task UpdateAsync(Tournament tournament);
-    Task<bool> DeleteAsync(string id);
+    Task<Tournament?> GetByIdWithDetailsAsync(string id);
+    Task<bool> ExistsByNameAsync(string name);
 }

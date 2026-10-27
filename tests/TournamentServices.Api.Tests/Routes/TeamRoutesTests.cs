@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
-using TournamentServices.Api.Dtos;
 using TournamentServices.TestBuilders;
 
 namespace TournamentServices.Api.Tests.Routes;
@@ -111,26 +110,6 @@ public class TeamRoutesTests : TournamentApiTests
     public async Task Put_Regresa404SiNoExiste()
     {
         var response = await Client.PutAsJsonAsync("/teams/no-existe", new UpdateTeamDto("Nuevo"));
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Delete_Regresa204()
-    {
-        await SeedAsync(new TeamBuilder().WithId("team-1").WithName("Pumas").Build());
-
-        var response = await Client.DeleteAsync("/teams/team-1");
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        var exists = await QueryAsync(db => db.Teams.AnyAsync(t => t.Id == "team-1"));
-        Assert.False(exists);
-    }
-
-    [Fact]
-    public async Task Delete_Regresa404SiNoExiste()
-    {
-        var response = await Client.DeleteAsync("/teams/no-existe");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

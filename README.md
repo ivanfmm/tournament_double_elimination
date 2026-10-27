@@ -15,5 +15,5 @@ Como levantar el proyecto:
      Por lo general te aparece una ventana que te dice "Reopen in container" (o algo similar), y le das click. Para ello debes tener la extension de Dev containers.
 
 
-5. Ya para cuando se quieran ejecutar los endpoints y probarlos, es necesario en la terminal integrada de VS Code (ya dentro del contenedor): dotnet watch run --project Tournament.Api . Cada vez que guardes un archivo .cs se recompila solo. (ESTO NO ES NECESARIO DE TODAVIA)
+5. Ya para cuando se quieran ejecutar los endpoints y probarlos, es necesario en la terminal integrada de VS Code (ya dentro del contenedor): dotnet watch run --project src/TournamentServices.Api . Cada vez que guardes un archivo .cs se recompila solo. (ESTO NO ES NECESARIO DE TODAVIA)
 

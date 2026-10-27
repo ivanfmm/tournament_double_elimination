@@ -20,17 +20,16 @@ public class MatchRepository : IMatchRepository
             .ToListAsync();
     }
 
-    // Aqui SI se trackea: el Delegate carga el match, le aplica SetScore
-    // y luego llama UpdateAsync sobre esa misma instancia.
     public async Task<Match?> GetByIdAsync(string id)
     {
         return await _context.Matches.FirstOrDefaultAsync(m => m.Id == id);
     }
 
-    public async Task AddAsync(Match match)
+    public async Task<Match> AddAsync(Match match)
     {
         _context.Matches.Add(match);
         await _context.SaveChangesAsync();
+        return match;
     }
 
     public async Task UpdateAsync(Match match)
@@ -39,15 +38,13 @@ public class MatchRepository : IMatchRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task DeleteAsync(string id)
+    public async Task<bool> DeleteAsync(string id)
     {
-        var match = await _context.Matches.FirstOrDefaultAsync(m => m.Id == id);
-        if (match is null)
-        {
-            return;
-        }
+        int rowsAffected = await _context.Matches
+            .Where(m => m.Id == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(m => EF.Property<DateTime?>(m, "deleted_at"), DateTime.UtcNow));
 
-        _context.Matches.Remove(match);
-        await _context.SaveChangesAsync();
+        return rowsAffected > 0;
     }
 }

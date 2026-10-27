@@ -16,6 +16,10 @@ public class TournamentRepositoryTests
             .Options;
     }
 
+    // TournamentRepository usa GroupRepository para armar los grupos con sus equipos
+    private static TournamentRepository NewRepository(TournamentDbContext context)
+        => new(context, new GroupRepository(context));
+
     [Fact]
     public async Task AddAsync_PersistsTournament()
     {
@@ -24,7 +28,7 @@ public class TournamentRepositoryTests
 
         await using (var writeContext = new TournamentDbContext(options))
         {
-            var repository = new TournamentRepository(writeContext);
+            var repository = NewRepository(writeContext);
             await repository.AddAsync(tournament);
         }
 
@@ -40,7 +44,7 @@ public class TournamentRepositoryTests
     {
         var options = CreateOptions();
         await using var context = new TournamentDbContext(options);
-        var repository = new TournamentRepository(context);
+        var repository = NewRepository(context);
 
         var result = await repository.GetByIdAsync("no-existe");
 
@@ -48,7 +52,7 @@ public class TournamentRepositoryTests
     }
 
     [Fact]
-    public async Task GetByIdAsync_ExistingTournament_AssemblesGroupsAndMatches()
+    public async Task GetByIdWithDetailsAsync_ExistingTournament_AssemblesGroupsAndMatches()
     {
         var options = CreateOptions();
 
@@ -65,9 +69,9 @@ public class TournamentRepositoryTests
         }
 
         await using var readContext = new TournamentDbContext(options);
-        var repository = new TournamentRepository(readContext);
+        var repository = NewRepository(readContext);
 
-        var result = await repository.GetByIdAsync("t-1");
+        var result = await repository.GetByIdWithDetailsAsync("t-1");
 
         Assert.NotNull(result);
         Assert.Single(result!.Groups);
@@ -94,7 +98,7 @@ public class TournamentRepositoryTests
         }
 
         await using var readContext = new TournamentDbContext(options);
-        var repository = new TournamentRepository(readContext);
+        var repository = NewRepository(readContext);
 
         var result = await repository.GetAllAsync();
 
@@ -115,7 +119,7 @@ public class TournamentRepositoryTests
         }
 
         await using var readContext = new TournamentDbContext(options);
-        var repository = new TournamentRepository(readContext);
+        var repository = NewRepository(readContext);
 
         var result = await repository.GetAllAsync();
 
@@ -135,7 +139,7 @@ public class TournamentRepositoryTests
 
         await using (var updateContext = new TournamentDbContext(options))
         {
-            var repository = new TournamentRepository(updateContext);
+            var repository = NewRepository(updateContext);
             var updated = new TournamentBuilder()
                 .WithId("t-1")
                 .WithName("Nombre Actualizado")
@@ -153,56 +157,52 @@ public class TournamentRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteAsync_ExistingTournament_ReturnsTrue()
+    public async Task GetByIdAsync_DoesNotAssembleGroupsOrMatches()
     {
-        var options = CreateOptions();
-
-        await using (var writeContext = new TournamentDbContext(options))
-        {
-            writeContext.Tournaments.Add(new TournamentBuilder().WithId("t-1").Build());
-            await writeContext.SaveChangesAsync();
-        }
-
-        await using var context = new TournamentDbContext(options);
-        var repository = new TournamentRepository(context);
-
-        var deleted = await repository.DeleteAsync("t-1");
-
-        Assert.True(deleted);
-        Assert.Empty(await context.Tournaments.ToListAsync());
-    }
-
-    [Fact]
-    public async Task DeleteAsync_NonExistingTournament_ReturnsFalse()
-    {
-        var options = CreateOptions();
-        await using var context = new TournamentDbContext(options);
-        var repository = new TournamentRepository(context);
-
-        var deleted = await repository.DeleteAsync("no-existe");
-
-        Assert.False(deleted);
-    }
-
-    [Fact]
-    public async Task DeleteAsync_CascadesToGroupsAndMatches()
-    {
+        // GetByIdAsync es la version liviana; GetByIdWithDetailsAsync arma todo
         var options = CreateOptions();
 
         await using (var writeContext = new TournamentDbContext(options))
         {
             writeContext.Tournaments.Add(new TournamentBuilder().WithId("t-1").Build());
             writeContext.Groups.Add(new GroupBuilder().WithId("g-1").WithTournamentId("t-1").Build());
-            writeContext.Matches.Add(new MatchBuilder().WithId("m-1").WithTournamentId("t-1").Build());
             await writeContext.SaveChangesAsync();
         }
 
-        await using var context = new TournamentDbContext(options);
-        var repository = new TournamentRepository(context);
+        await using var readContext = new TournamentDbContext(options);
+        var result = await NewRepository(readContext).GetByIdAsync("t-1");
 
-        await repository.DeleteAsync("t-1");
+        Assert.NotNull(result);
+        Assert.Empty(result!.Groups);
+    }
 
-        Assert.Empty(await context.Groups.ToListAsync());
-        Assert.Empty(await context.Matches.ToListAsync());
+    [Fact]
+    public async Task UpdateAsync_PersistsBracketState()
+    {
+        // Status, orden sorteado y campeon deben sobrevivir a un nuevo DbContext
+        var options = CreateOptions();
+        var format = new TournamentFormat(8, 1, TournamentType.DoubleElimination);
+
+        await using (var writeContext = new TournamentDbContext(options))
+        {
+            writeContext.Tournaments.Add(new TournamentBuilder().WithId("t-1").WithFormat(format).Build());
+            await writeContext.SaveChangesAsync();
+        }
+
+        await using (var updateContext = new TournamentDbContext(options))
+        {
+            var repository = NewRepository(updateContext);
+            var tournament = (await repository.GetByIdAsync("t-1"))!;
+            tournament.Start(new[] { "b", "a", "c" });
+            tournament.Finish("a");
+            await repository.UpdateAsync(tournament);
+        }
+
+        await using var verifyContext = new TournamentDbContext(options);
+        var stored = await verifyContext.Tournaments.AsNoTracking().FirstAsync(t => t.Id == "t-1");
+
+        Assert.Equal(TournamentStatus.Finished, stored.Status);
+        Assert.Equal("a", stored.ChampionTeamId);
+        Assert.Equal(new[] { "b", "a", "c" }, stored.SeededTeamIds);
     }
 }

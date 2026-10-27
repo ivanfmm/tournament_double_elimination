@@ -19,13 +19,17 @@ public class TeamRepository : ITeamRepository
 
     public async Task<List<Team>> GetAllAsync()
     {
-        return await _context.Teams.ToListAsync();
+        return await _context.Teams
+        .AsNoTracking()
+        .Where(t => EF.Property<DateTime?>(t, "deleted_at") == null)
+        .ToListAsync();
     }
 
-    public async Task AddAsync(Team team)
+    public async Task<Team> AddAsync(Team team)
     {
         _context.Teams.Add(team);
         await _context.SaveChangesAsync();
+        return team;
     }
 
     public async Task UpdateAsync(Team team)
@@ -34,18 +38,20 @@ public class TeamRepository : ITeamRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task DeleteAsync(string id)
+    public async Task<bool> DeleteAsync(string id)
     {
-        var team = await _context.Teams.FirstOrDefaultAsync(t => t.Id == id);
-        if (team is not null)
-        {
-            _context.Teams.Remove(team);
-            await _context.SaveChangesAsync();
-        }
+        int rowsAffected = await _context.Teams
+            .Where(t => t.Id == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(t => EF.Property<DateTime?>(t, "deleted_at"), DateTime.UtcNow));
+
+        return rowsAffected > 0;
     }
 
     public async Task<bool> ExistsByNameAsync(string name)
     {
-        return await _context.Teams.AnyAsync(t => t.Name == name);
+        return await _context.Teams
+            .Where(t => EF.Property<DateTime?>(t, "deleted_at") == null)
+            .AnyAsync(t => t.Name == name);
     }
 }

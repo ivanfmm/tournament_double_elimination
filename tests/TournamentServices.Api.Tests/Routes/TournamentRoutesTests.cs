@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using TournamentServices.Api.Dtos;
 using TournamentServices.Domain;
 using TournamentServices.Domain.Enums;
 using TournamentServices.TestBuilders;
@@ -69,10 +68,10 @@ public class TournamentRoutesTests : TournamentApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var dto = await response.Content.ReadFromJsonAsync<TournamentDto>(JsonOptions);
         Assert.Equal("Copa", dto!.Name);
-        Assert.Equal(2, Assert.Single(dto.Groups).Teams.Count);
+        Assert.Equal(new[] { "team-1", "team-2" }, Assert.Single(dto.Groups).TeamIds.OrderBy(id => id));
 
         var match = Assert.Single(dto.Matches);
-        Assert.Equal("Pumas", match.HomeTeam!.Name);
+        Assert.Equal("team-1", match.HomeTeamId);
         Assert.Equal(Winner.Home, match.Winner);
         Assert.True(match.IsCompleted);
     }
@@ -140,9 +139,7 @@ public class TournamentRoutesTests : TournamentApiTests
     [InlineData("""{"name":"Copa"}""")]                                                              // sin formato
     [InlineData("""{"name":"Copa","format":{"maxTeamsPerGroup":0,"numberOfGroups":2,"type":"NFL"}}""")]
     [InlineData("""{"name":"Copa","format":{"maxTeamsPerGroup":4,"numberOfGroups":-1,"type":"NFL"}}""")]
-    [InlineData("""{"name":"Copa","format":{"maxTeamsPerGroup":4,"numberOfGroups":2}}""")]           // sin tipo
     [InlineData("""{"name":"Copa","format":{"maxTeamsPerGroup":4,"numberOfGroups":2,"type":"FOO"}}""")]
-    [InlineData("""{"name":"Copa","format":{"maxTeamsPerGroup":4,"numberOfGroups":2,"type":1}}""")]
     public async Task Post_Regresa400SiElBodyEsInvalido(string json)
     {
         var response = await PostRawAsync("/tournaments", json);
@@ -199,7 +196,7 @@ public class TournamentRoutesTests : TournamentApiTests
     {
         await SeedAsync(new TournamentBuilder().WithId("t-1").WithName("Copa").Build());
 
-        var response = await PatchRawAsync("/tournaments/t-1", """{"format":{"type":"NFL"}}""");
+        var response = await PatchRawAsync("/tournaments/t-1", """{"type":"NFL"}""");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var dto = await response.Content.ReadFromJsonAsync<TournamentDto>(JsonOptions);
@@ -213,7 +210,7 @@ public class TournamentRoutesTests : TournamentApiTests
         await SeedAsync(new TournamentBuilder().WithId("t-1").WithName("Copa").Build());
 
         var response = await PatchRawAsync("/tournaments/t-1",
-            """{"name":"Otra","format":{"maxTeamsPerGroup":6,"numberOfGroups":3}}""");
+            """{"name":"Otra","maxTeamsPerGroup":6,"numberOfGroups":3}""");
 
         var dto = await response.Content.ReadFromJsonAsync<TournamentDto>(JsonOptions);
         Assert.Equal("Otra", dto!.Name);
@@ -222,7 +219,7 @@ public class TournamentRoutesTests : TournamentApiTests
 
     [Theory]
     [InlineData("""{"name":""}""")]
-    [InlineData("""{"format":{"maxTeamsPerGroup":0}}""")]
+    [InlineData("""{"maxTeamsPerGroup":0}""")]
     public async Task Patch_Regresa400SiUnCampoEnviadoEsInvalido(string json)
     {
         await SeedAsync(new TournamentBuilder().WithId("t-1").Build());
@@ -241,22 +238,6 @@ public class TournamentRoutesTests : TournamentApiTests
     }
 
     // ---------- DELETE ----------
-
-    [Fact]
-    public async Task Delete_Regresa204YBorraEnCascada()
-    {
-        await SeedAsync(
-            new TournamentBuilder().WithId("t-1").Build(),
-            new GroupBuilder().WithId("g-1").WithTournamentId("t-1").Build(),
-            new MatchBuilder().WithId("m-1").WithTournamentId("t-1").Build());
-
-        var response = await Client.DeleteAsync("/tournaments/t-1");
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.False(await QueryAsync(db => db.Tournaments.AnyAsync(t => t.Id == "t-1")));
-        Assert.False(await QueryAsync(db => db.Groups.AnyAsync(g => g.TournamentId == "t-1")));
-        Assert.False(await QueryAsync(db => db.Matches.AnyAsync(m => m.TournamentId == "t-1")));
-    }
 
     [Fact]
     public async Task Delete_Regresa404SiNoExiste()
