@@ -1,6 +1,6 @@
 import { api, ApiError } from './api.js';
 import { loadTeams } from './teams.js';
-import { state, setTournament, teamName, isKnownTeam, h, toast, withBusy, reportError, go } from './ui.js';
+import { state, setTournament, teamName, teamBadge, isKnownTeam, h, toast, withBusy, reportError, go } from './ui.js';
 
 const tournamentType = 'DOUBLE_ELIMINATION';
 const statusText = { CREATED: 'Inscripción abierta', IN_PROGRESS: 'En juego', FINISHED: 'Terminado' };
@@ -294,7 +294,7 @@ function inscribePanel(tournament, inscribed, capacity, rerender) {
     h('div', { class: 'block-head' }, h('h4', {}, 'Inscribir equipos'), counter),
     h('div', { class: 'inline-form' }, selectAll, clear),
     h('ul', { class: 'check-list' }, available.map((team, i) =>
-      h('li', {}, boxes[i], h('label', { for: `chk-${team.id}` }, team.name)))),
+      h('li', {}, boxes[i], h('label', { for: `chk-${team.id}` }, teamBadge(team.id), team.name)))),
     submit,
   );
   refresh();
@@ -340,6 +340,6 @@ function groupsView(tournament) {
     h('div', { class: 'groups-grid' }, tournament.groups.map((g) =>
       h('div', { class: 'group-card' },
         h('h5', {}, `${g.name} (${g.teamIds.length} de ${tournament.format.maxTeamsPerGroup})`),
-        g.teamIds.length ? h('ol', {}, g.teamIds.map((id) => h('li', {}, teamName(id)))) : h('p', { class: 'empty' }, 'Sin equipos')))),
+        g.teamIds.length ? h('ol', {}, g.teamIds.map((id) => h('li', {}, teamBadge(id), teamName(id)))) : h('p', { class: 'empty' }, 'Sin equipos')))),
   );
 }

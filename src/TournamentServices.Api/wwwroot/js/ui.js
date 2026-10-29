@@ -32,6 +32,28 @@ export function teamName(teamId) {
   return state.teamNames.get(teamId) ?? `Equipo eliminado (${teamId.slice(0, 6)})`;
 }
 
+const smallWords = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y']);
+
+function initialsOf(name) {
+  const words = name.split(/\s+/).filter((w) => w && !smallWords.has(w.toLowerCase()));
+  const letters = (words.length > 1 ? [words[0], words[1]] : [name]).map((w) => w[0]).join('');
+  return letters.toUpperCase().slice(0, 2);
+}
+
+// El color sale del id para que un equipo conserve el mismo color aunque lo renombren.
+function hueOf(text) {
+  let hash = 0;
+  for (const char of text) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return (hash % 12) * 30;
+}
+
+export function teamBadge(teamId, size = 'small') {
+  if (!teamId) return h('span', { class: `badge badge-${size} badge-empty`, 'aria-hidden': 'true' });
+  const name = state.teamNames.get(teamId);
+  return h('span', { class: `badge badge-${size}${name ? '' : ' badge-empty'}`, style: `--hue: ${hueOf(teamId)}`, 'aria-hidden': 'true' },
+    name ? initialsOf(name) : '');
+}
+
 export function isKnownTeam(teamId) {
   return state.teamNames.has(teamId);
 }

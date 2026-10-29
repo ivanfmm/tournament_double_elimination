@@ -2,7 +2,7 @@ import { api, ApiError } from './api.js';
 import { loadTeams } from './teams.js';
 import { layoutFor, placeMatches, winnersFeeders } from './bracket-layout.js';
 import { simulateRound, simulateAll } from './simulate.js';
-import { state, setTournament, teamName, h, toast, withBusy, reportError, go } from './ui.js';
+import { state, setTournament, teamName, teamBadge, h, toast, withBusy, reportError, go } from './ui.js';
 
 let currentRoot = null;
 // La simulación redibuja la vista varias veces; con esto los botones nuevos nacen deshabilitados.
@@ -88,6 +88,8 @@ function header(tournament, played, total, pendingCount) {
     ),
     h('div', { class: 'bracket-meta' },
       h('p', { class: 'played' }, h('strong', {}, String(played)), ` de ${total} partidos jugados`),
+      h('div', { class: 'progress-bar', role: 'progressbar', 'aria-label': 'Avance del torneo', 'aria-valuemin': '0', 'aria-valuemax': String(total), 'aria-valuenow': String(played) },
+        h('span', { style: `width: ${total ? Math.round((played / total) * 100) : 0}%` })),
       h('div', { class: 'inline-form' },
         simulating ? h('span', { class: 'demo-tag' }, 'Demo') : null,
         simulating ? roundButton : null,
@@ -125,12 +127,35 @@ async function championBanner(tournament, hasReset) {
     }
   }
   return h('div', { class: 'champion', role: 'status' },
-    h('p', { class: 'champion-label' }, 'Campeón'),
-    h('p', { class: 'champion-name' }, teamName(championId)),
-    h('p', { class: 'champion-note' }, hasReset
-      ? 'Llegó por losers, ganó la gran final y también el desempate.'
-      : 'Ganó la gran final.'),
+    trophyIcon(),
+    teamBadge(championId, 'large'),
+    h('div', { class: 'champion-text' },
+      h('p', { class: 'champion-label' }, 'Campeón'),
+      h('p', { class: 'champion-name' }, teamName(championId)),
+      h('p', { class: 'champion-note' }, hasReset
+        ? 'Llegó por losers, ganó la gran final y también el desempate.'
+        : 'Ganó la gran final.')),
   );
+}
+
+function trophyIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 64 64');
+  svg.setAttribute('class', 'trophy');
+  svg.setAttribute('aria-hidden', 'true');
+  const shapes = [
+    ['path', { d: 'M20 8h24v14a12 12 0 0 1-24 0z' }],
+    ['path', { d: 'M20 12h-8v4a10 10 0 0 0 10 10M44 12h8v4a10 10 0 0 1-10 10', fill: 'none', 'stroke-width': '4' }],
+    ['rect', { x: '28', y: '33', width: '8', height: '11' }],
+    ['rect', { x: '18', y: '44', width: '28', height: '7', rx: '2' }],
+  ];
+  for (const [tag, attrs] of shapes) {
+    const node = document.createElementNS(ns, tag);
+    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+    svg.append(node);
+  }
+  return svg;
 }
 
 function side(title, description, kind, columns, connected) {
@@ -141,8 +166,10 @@ function side(title, description, kind, columns, connected) {
 }
 
 function renderColumn(column, renderSlot) {
+  const matchCount = column.slots.filter((slot) => slot.kind !== 'bye' && slot.kind !== 'carry').length;
   return h('div', { class: 'column', dataset: { column: column.id } },
-    h('h4', { class: 'column-title' }, column.title),
+    h('h4', { class: 'column-title' }, column.title,
+      matchCount > 1 ? h('span', { class: 'column-count' }, `${matchCount} partidos`) : null),
     column.note ? h('p', { class: 'column-note' }, column.note) : null,
     h('ol', { class: 'slots' }, column.slots.map((slot) => h('li', { class: 'slot' }, renderSlot(slot)))),
   );
@@ -180,11 +207,13 @@ function finalSlot(slot, byKey, hasReset) {
 
 function placeholderCard(feeders) {
   return h('div', { class: 'card card-placeholder' },
-    feeders.map((f) => (f.teamId ? teamLine(f.teamId, null, false) : h('p', { class: 'team team-unknown' }, h('span', { class: 'team-name' }, f.from)))));
+    feeders.map((f) => (f.teamId ? teamLine(f.teamId, null, false)
+      : h('p', { class: 'team team-unknown' }, teamBadge(null), h('span', { class: 'team-name' }, f.from)))));
 }
 
 function teamLine(teamId, score, isWinner, isLoser = false) {
   return h('p', { class: `team${isWinner ? ' is-winner' : ''}${isLoser ? ' is-loser' : ''}`, dataset: teamId ? { team: teamId } : undefined },
+    teamBadge(teamId),
     h('span', { class: 'team-name' }, teamName(teamId)),
     score === null ? null : h('span', { class: 'team-score' }, String(score)));
 }
@@ -200,7 +229,7 @@ function matchCard(match, label) {
   if (done) return h('div', { class: 'card card-done', 'aria-label': `${label}, terminado` }, lines);
 
   return h('button', { class: 'card card-playable', type: 'button', 'aria-label': `${label}: ${teamName(match.homeTeamId)} contra ${teamName(match.visitorTeamId)}. Capturar marcador`,
-    onclick: () => openScoreDialog(match, label) }, lines);
+    onclick: () => openScoreDialog(match, label) }, lines, h('span', { class: 'card-cta', 'aria-hidden': 'true' }, 'Capturar'));
 }
 
 function wireHighlight(view) {

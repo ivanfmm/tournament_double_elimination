@@ -1,5 +1,5 @@
 import { api, ApiError } from './api.js';
-import { state, setTeams, h, toast, withBusy, reportError } from './ui.js';
+import { state, setTeams, teamBadge, h, toast, withBusy, reportError } from './ui.js';
 
 const sampleNames = [
   'Halcones de Bruma', 'Linces del Valle', 'Coyotes de Arena', 'Mantarrayas Azules',
@@ -118,7 +118,7 @@ export async function renderTeams(root) {
 }
 
 function teamRow(team, rerender) {
-  const nameCell = h('td', {}, team.name);
+  const nameCell = h('td', {}, h('span', { class: 'team-cell' }, teamBadge(team.id), team.name));
   const row = h('tr', {}, nameCell);
 
   const editButton = h('button', { class: 'btn btn-small btn-quiet', type: 'button', onclick: () => startEdit() }, 'Renombrar');
