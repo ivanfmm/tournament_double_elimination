@@ -238,7 +238,7 @@ export function winnersFeeders(layout, round, index, byKey, seededTeamIds) {
     if (match?.isCompleted && match.winner) {
       return { teamId: match.winner === 'HOME' ? match.homeTeamId : match.visitorTeamId, from: null };
     }
-    return { teamId: null, from: `Ganador de ${layout.winners[round - 2].title} (${feederIndex + 1})` };
+    return { teamId: null, from: `Ganador del partido ${feederIndex + 1}` };
   };
   return [feeder(index * 2), feeder(index * 2 + 1)];
 }

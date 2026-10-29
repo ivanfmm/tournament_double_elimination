@@ -2,6 +2,7 @@ import { api, ApiError } from './api.js';
 import { loadTeams } from './teams.js';
 import { layoutFor, placeMatches, winnersFeeders } from './bracket-layout.js';
 import { simulateRound, simulateAll } from './simulate.js';
+import { createFighter } from './fighter.js';
 import { state, setTournament, teamName, teamBadge, h, toast, withBusy, reportError, go } from './ui.js';
 
 let currentRoot = null;
@@ -127,7 +128,7 @@ async function championBanner(tournament, hasReset) {
     }
   }
   return h('div', { class: 'champion', role: 'status' },
-    trophyIcon(),
+    createFighter('fighter fighter-champion'),
     teamBadge(championId, 'large'),
     h('div', { class: 'champion-text' },
       h('p', { class: 'champion-label' }, 'Campeón'),
@@ -136,26 +137,6 @@ async function championBanner(tournament, hasReset) {
         ? 'Llegó por losers, ganó la gran final y también el desempate.'
         : 'Ganó la gran final.')),
   );
-}
-
-function trophyIcon() {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', '0 0 64 64');
-  svg.setAttribute('class', 'trophy');
-  svg.setAttribute('aria-hidden', 'true');
-  const shapes = [
-    ['path', { d: 'M20 8h24v14a12 12 0 0 1-24 0z' }],
-    ['path', { d: 'M20 12h-8v4a10 10 0 0 0 10 10M44 12h8v4a10 10 0 0 1-10 10', fill: 'none', 'stroke-width': '4' }],
-    ['rect', { x: '28', y: '33', width: '8', height: '11' }],
-    ['rect', { x: '18', y: '44', width: '28', height: '7', rx: '2' }],
-  ];
-  for (const [tag, attrs] of shapes) {
-    const node = document.createElementNS(ns, tag);
-    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
-    svg.append(node);
-  }
-  return svg;
 }
 
 function side(title, description, kind, columns, connected) {

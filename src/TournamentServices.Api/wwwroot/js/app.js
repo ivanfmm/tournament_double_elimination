@@ -3,6 +3,7 @@ import { renderTeams } from './teams.js';
 import { renderTournament } from './tournament.js';
 import { renderBracket } from './bracket-view.js';
 import { reportError } from './ui.js';
+import { createFighter } from './fighter.js';
 
 const sections = {
   equipos: renderTeams,
@@ -48,6 +49,7 @@ async function checkHealth() {
 if (location.protocol === 'file:') {
   document.getElementById('file-warning').hidden = false;
 } else {
+  document.getElementById('hero-fighter').append(createFighter());
   window.addEventListener('hashchange', show);
   checkHealth();
   show();
