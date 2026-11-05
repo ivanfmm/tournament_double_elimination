@@ -131,4 +131,53 @@ public class TournamentTests
 
         Assert.Throws<DomainValidationException>(() => tournament.AddMatch(null!));
     }
+
+    [Fact]
+    public void Start_WithTwoOrMoreTeams_SetsInProgressAndKeepsSeedOrder()
+    {
+        var tournament = new Tournament("tournament-1", "Copa", DefaultFormat());
+
+        tournament.Start(new[] { "t2", "t1", "t3" });
+
+        Assert.Equal(TournamentStatus.InProgress, tournament.Status);
+        Assert.Equal(new[] { "t2", "t1", "t3" }, tournament.SeededTeamIds);
+    }
+
+    [Fact]
+    public void Start_WithLessThanTwoTeams_ThrowsDomainValidationException()
+    {
+        var tournament = new Tournament("tournament-1", "Copa", DefaultFormat());
+
+        Assert.Throws<DomainValidationException>(() => tournament.Start(new[] { "t1" }));
+        Assert.Equal(TournamentStatus.Created, tournament.Status);
+    }
+
+    [Fact]
+    public void Start_Twice_ThrowsDomainValidationException()
+    {
+        var tournament = new Tournament("tournament-1", "Copa", DefaultFormat());
+        tournament.Start(new[] { "t1", "t2" });
+
+        Assert.Throws<DomainValidationException>(() => tournament.Start(new[] { "t1", "t2" }));
+    }
+
+    [Fact]
+    public void Finish_WhenInProgress_SetsChampionAndFinished()
+    {
+        var tournament = new Tournament("tournament-1", "Copa", DefaultFormat());
+        tournament.Start(new[] { "t1", "t2" });
+
+        tournament.Finish("t1");
+
+        Assert.Equal(TournamentStatus.Finished, tournament.Status);
+        Assert.Equal("t1", tournament.ChampionTeamId);
+    }
+
+    [Fact]
+    public void Finish_WhenNotStarted_ThrowsDomainValidationException()
+    {
+        var tournament = new Tournament("tournament-1", "Copa", DefaultFormat());
+
+        Assert.Throws<DomainValidationException>(() => tournament.Finish("t1"));
+    }
 }

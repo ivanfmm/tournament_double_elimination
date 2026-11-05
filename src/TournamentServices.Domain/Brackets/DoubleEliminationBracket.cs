@@ -5,8 +5,6 @@ namespace TournamentServices.Domain.Brackets;
 
 public class DoubleEliminationBracket
 {
-    private enum Origin { Winners, Losers, GrandFinal, GrandFinalReset }
-
     private readonly string _tournamentId;
     private readonly int _rounds;
     private readonly BracketSlot[] _initialSlots;
@@ -28,7 +26,7 @@ public class DoubleEliminationBracket
     // --- Gran final ---
     private string? _grandFinalMatchId;
 
-    private readonly Dictionary<string, (Origin Origin, int Level, int Index)> _matchDestinations = new();
+    private readonly Dictionary<string, (BracketSide Origin, int Level, int Index)> _matchDestinations = new();
     private readonly Dictionary<string, Match> _matchesById = new();
     private readonly List<Match> _pendingMatches = new();
 
@@ -141,7 +139,7 @@ public class DoubleEliminationBracket
         var match = new Match(matchId, _tournamentId, homeTeamId, visitorTeamId);
 
         _matchesById[matchId] = match;
-        _matchDestinations[matchId] = (Origin.Winners, level, index);
+        _matchDestinations[matchId] = (BracketSide.Winners, level, index);
         _pendingMatches.Add(match);
     }
 
@@ -213,6 +211,14 @@ public class DoubleEliminationBracket
 
         if (_nextWbRoundToMerge <= _rounds)
         {
+            // Si hay mas sobrevivientes que equipos por bajar del winners,
+            // primero juegan entre ellos; asi nadie pasa gratis al drop-in.
+            if (_lbCurrentSurvivors.Count > _wbRoundExpectedMatchCount[_nextWbRoundToMerge])
+            {
+                StartLbRound(_lbCurrentSurvivors, isDropIn: false, wbNewcomers: null, wbRoundLabel: null);
+                return;
+            }
+
             if (_wbRoundLosers.TryGetValue(_nextWbRoundToMerge, out var newcomers) &&
                 newcomers.Count == _wbRoundExpectedMatchCount[_nextWbRoundToMerge])
             {
@@ -253,7 +259,7 @@ public class DoubleEliminationBracket
             var match = new Match(matchId, _tournamentId, home, visitor);
 
             _matchesById[matchId] = match;
-            _matchDestinations[matchId] = (Origin.Losers, 0, i);
+            _matchDestinations[matchId] = (BracketSide.Losers, 0, i);
             _pendingMatches.Add(match);
         }
 
@@ -300,8 +306,39 @@ public class DoubleEliminationBracket
         var match = new Match(_grandFinalMatchId, _tournamentId, _winnersChampion, _losersChampion);
 
         _matchesById[_grandFinalMatchId] = match;
-        _matchDestinations[_grandFinalMatchId] = (Origin.GrandFinal, 0, 0);
+        _matchDestinations[_grandFinalMatchId] = (BracketSide.GrandFinal, 0, 0);
         _pendingMatches.Add(match);
+    }
+
+    // ----------------------------------------------------------------
+    // Reconstruccion desde la base de datos
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Arma el bracket con el orden ya sorteado y vuelve a aplicar los
+    /// resultados guardados. Los resultados deben venir en el MISMO orden
+    /// en que se reportaron, porque el emparejamiento del losers depende
+    /// del orden en que llegan los perdedores.
+    /// </summary>
+    public static DoubleEliminationBracket Replay(
+        string tournamentId,
+        IReadOnlyList<string> seededTeamIds,
+        IEnumerable<(string MatchKey, Winner Winner)> results)
+    {
+        var bracket = new DoubleEliminationBracket(tournamentId, seededTeamIds, new KeepOrderSeeder());
+
+        foreach (var (matchKey, winner) in results)
+        {
+            bracket.ReportResult(matchKey, winner);
+        }
+
+        return bracket;
+    }
+
+    // No baraja: el orden ya se sorteo al iniciar el torneo
+    private sealed class KeepOrderSeeder : ITeamSeeder
+    {
+        public IReadOnlyList<string> Seed(IReadOnlyList<string> teamIds) => teamIds;
     }
 
     // ----------------------------------------------------------------
@@ -323,12 +360,12 @@ public class DoubleEliminationBracket
 
         switch (origin)
         {
-            case Origin.Winners:
+            case BracketSide.Winners:
                 AdvanceWinnerBracketWinner(level + 1, index, winnerTeamId);
                 AddWbLoser(level + 1, loserTeamId);
                 break;
 
-            case Origin.Losers:
+            case BracketSide.Losers:
                 _lbPendingSurvivorsBuffer![index] = winnerTeamId;
                 if (Array.TrueForAll(_lbPendingSurvivorsBuffer, v => v is not null))
                 {
@@ -336,7 +373,7 @@ public class DoubleEliminationBracket
                 }
                 break;
 
-            case Origin.GrandFinal:
+            case BracketSide.GrandFinal:
                 if (winnerTeamId == _winnersChampion)
                 {
                     IsCompleted = true;
@@ -347,12 +384,12 @@ public class DoubleEliminationBracket
                     var resetId = "grand-final-reset";
                     var resetMatch = new Match(resetId, _tournamentId, winnerTeamId, loserTeamId);
                     _matchesById[resetId] = resetMatch;
-                    _matchDestinations[resetId] = (Origin.GrandFinalReset, 0, 0);
+                    _matchDestinations[resetId] = (BracketSide.GrandFinalReset, 0, 0);
                     _pendingMatches.Add(resetMatch);
                 }
                 break;
 
-            case Origin.GrandFinalReset:
+            case BracketSide.GrandFinalReset:
                 IsCompleted = true;
                 ChampionTeamId = winnerTeamId;
                 break;

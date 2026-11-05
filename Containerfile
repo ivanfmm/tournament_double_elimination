@@ -1,19 +1,19 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY Tournament.Api/*.csproj Tournament.Api/
-COPY Tournament.Domain/*.csproj Tournament.Domain/
-COPY Tournament.Delegate/*.csproj Tournament.Delegate/
-COPY Tournament.Repository/*.csproj Tournament.Repository/
-COPY Tournament.Common/*.csproj Tournament.Common/
-RUN dotnet restore Tournament.Api/*.csproj
+# Primero solo los .csproj para que el restore quede cacheado
+COPY src/TournamentServices.Domain/*.csproj        src/TournamentServices.Domain/
+COPY src/TournamentServices.Repositories/*.csproj  src/TournamentServices.Repositories/
+COPY src/TournamentServices.Delegates/*.csproj     src/TournamentServices.Delegates/
+COPY src/TournamentServices.Api/*.csproj           src/TournamentServices.Api/
+RUN dotnet restore src/TournamentServices.Api/TournamentServices.Api.csproj
 
-COPY . .
-RUN dotnet publish Tournament.Api -c Release -o /app/publish --no-restore
+COPY src/ src/
+RUN dotnet publish src/TournamentServices.Api -c Release -o /app/publish --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 
 EXPOSE 8080
-ENTRYPOINT ["dotnet", "Tournament.Api.dll"]
+ENTRYPOINT ["dotnet", "TournamentServices.Api.dll"]

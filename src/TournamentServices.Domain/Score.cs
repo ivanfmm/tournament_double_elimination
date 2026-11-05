@@ -1,4 +1,5 @@
 using TournamentServices.Domain.Exceptions;
+using System.Text.Json.Serialization;
 namespace TournamentServices.Domain;
 
 public record Score
@@ -7,7 +8,7 @@ public record Score
     public int VisitorTeamScore { get; }
 
     public Score() : this(0, 0) { }
-
+    [JsonConstructor]
     public Score(int homeTeamScore, int visitorTeamScore)
     {
         if (homeTeamScore < 0)

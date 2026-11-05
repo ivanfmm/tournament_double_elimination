@@ -1,41 +1,40 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using TournamentServices.Api.Extensions;
+using TournamentServices.Api.Handlers;
+using TournamentServices.Api.Routes;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddTournamentServices(builder.Configuration);
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
+// camelCase por defecto; enums como string: RoundRobin -> "ROUND_ROBIN", Home -> "HOME"
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(
+        new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper)));
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+app.UseExceptionHandler();
 
-app.UseHttpsRedirection();
-
-var summaries = new[]
+// UseDefaultFiles tiene que ir antes que UseStaticFiles para que "/" encuentre index.html.
+// Con no-cache el navegador revalida cada archivo y los cambios se ven con solo recargar.
+app.UseDefaultFiles();
+app.UseStaticFiles(new StaticFileOptions
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache"
+});
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+app.MapGet("/health", () => "Services running");
+app.MapTeamRoutes();
+app.MapTournamentRoutes();
+app.MapGroupRoutes();
+app.MapMatchRoutes();
+app.MapBracketRoutes();
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+// Necesario para pruebas de integración con WebApplicationFactory<Program>
+public partial class Program { }

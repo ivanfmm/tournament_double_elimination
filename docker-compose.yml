@@ -42,7 +42,7 @@ services:
         condition: service_healthy
     environment:
       # ASP.NET lee esto y sobreescribe appsettings.json
-      ConnectionStrings__Default: "Host=tournament_db;Port=5432;Database=tournament;Username=postgres;Password=password"
+      ConnectionStrings__DefaultConnection: "Host=tournament_db;Port=5432;Database=tournament_db;Username=tournament_svc;Password=password"
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
     ports:

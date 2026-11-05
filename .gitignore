@@ -73,3 +73,4 @@ docker-compose.dev.override.yml
 ##   - Tournament.sln, *.csproj, *.cs
 ## Todo esto es "infraestructura como código", no son secretos.
 ## ------------------------------------------------------------------
+PRUEBAS.md
