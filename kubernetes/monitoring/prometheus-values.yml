@@ -1,0 +1,4 @@
+# Valores por defecto de kube-prometheus-stack.
+# Aquí se agregan personalizaciones si hacen falta.
+grafana:
+  enabled: true

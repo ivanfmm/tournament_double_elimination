@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: localhost/tournaments-api:v10
+          image: localhost/tournaments-api:v11
           imagePullPolicy: Never
           resources:
             requests:

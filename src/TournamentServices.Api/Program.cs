@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using TournamentServices.Api.Extensions;
 using TournamentServices.Api.Handlers;
 using TournamentServices.Api.Routes;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +27,9 @@ app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache"
 });
+
+app.UseHttpMetrics();   // mide cada petición HTTP (duración, códigos, etc.)
+app.MapMetrics();
 
 app.MapGet("/health", () => "Services running");
 app.MapTeamRoutes();
