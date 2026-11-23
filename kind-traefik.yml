@@ -1,0 +1,23 @@
+# Cluster kind para usar Ingress con Traefik.
+# Igual que kind.yml, pero el puerto 8080 del host apunta al NodePort de
+# Traefik (30081) en lugar del NodePort directo de la API (30080).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # Traefik (entrypoint web)
+      - containerPort: 30081
+        hostPort: 8080
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      # Grafana
+      - containerPort: 30030
+        hostPort: 3000
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      # Prometheus
+      - containerPort: 30090
+        hostPort: 9090
+        listenAddress: "127.0.0.1"
+        protocol: TCP

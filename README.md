@@ -40,3 +40,9 @@ En doble eliminación los grupos sólo sirven para inscribir equipos: al iniciar
 todos se sortean juntos. La estructura del bracket que dibuja la interfaz
 (`wwwroot/js/bracket-layout.js`) replica la lógica de
 `Domain/Brackets/DoubleEliminationBracket.cs`; si se cambia una, hay que cambiar la otra.
+
+## Ingress con Traefik
+
+Para entrar a la API por un Ingress (Traefik, host `tournaments.local:8080`) en
+lugar del NodePort directo, sigue [docs/ingress.md](docs/ingress.md). Usa
+`kind-traefik.yml` para crear el cluster y los archivos de `kubernetes/traefik/`.
