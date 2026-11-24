@@ -53,6 +53,27 @@ $env:TRAEFIK_CHART_VERSION = "<version>"
 helm upgrade --install traefik traefik/traefik --version $env:TRAEFIK_CHART_VERSION --namespace traefik --create-namespace --values kubernetes/traefik/values.yml --wait --timeout 5m
 ```
 
+> **Nota de versión (probado en k8s v1.37.0, 2026-11):** el chart `traefik/traefik`
+> **42.x** cambió el schema de valores y ya **no acepta `service.type`** (error
+> `additional properties 'type' not allowed at '/service'`). Para usar este
+> `kubernetes/traefik/values.yml` tal cual, fija la versión estable más reciente
+> **anterior a 42.0.0**, probada aquí: `41.7.1` (Traefik app v3.7.14). Verifica
+> cuál valida con tu `values.yml`:
+>
+> ```powershell
+> helm template traefik traefik/traefik --version <v> --values kubernetes/traefik/values.yml | Out-Null
+> ```
+>
+> Si no hay error de schema, esa versión sirve. En este chart el tipo del Service
+> va en **`service.spec.type`** (la clave vieja `service.type` se ignora en
+> silencio y el Service quedaría `LoadBalancer`); por eso `values.yml` usa
+> `service.spec.type: NodePort`, y el `nodePort: 30081` lo fija `ports.web.nodePort`.
+> Verifica que quedó bien:
+>
+> ```powershell
+> kubectl -n traefik get svc traefik -o custom-columns='TYPE:.spec.type,NODEPORT:.spec.ports[0].nodePort'
+> ```
+
 Verificar:
 
 ```powershell
@@ -107,12 +128,31 @@ El ServiceMonitor de Prometheus usa el Service interno, no cambia. Grafana
 
 ### Cluster existente sin el mapeo
 
-Para probar el ruteo sin recrear el cluster (no es persistente). Detén antes
-cualquier port-forward que use el 8080:
+Para probar el ruteo sin recrear el cluster (no es persistente). Si el cluster
+actual ya mapea el 8080 del host al NodePort directo de la API (30080), **ese
+puerto está ocupado**: usa otro puerto local, p. ej. **8082**:
 
 ```powershell
-kubectl -n traefik port-forward service/traefik 8080:80
+kubectl -n traefik port-forward service/traefik 8082:80
 ```
+
+Deja ese comando corriendo en una terminal y, en otra, prueba el ruteo por
+Traefik (ajusta el puerto si usaste otro):
+
+```powershell
+curl.exe --fail --resolve tournaments.local:8082:127.0.0.1 http://tournaments.local:8082/health
+curl.exe --fail --resolve tournaments.local:8082:127.0.0.1 http://tournaments.local:8082/teams
+curl.exe --resolve tournaments.local:8082:127.0.0.1 http://tournaments.local:8082/
+```
+
+Loadtest contra Traefik por este puerto:
+
+```powershell
+locust -f loadtest/locustfile.py --host http://tournaments.local:8082
+```
+
+En este modo, Grafana (3000) y Prometheus (9090) siguen accediéndose directo por
+sus NodePort; no pasan por Traefik.
 
 ## Problemas comunes
 

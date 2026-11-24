@@ -9,8 +9,11 @@ providers:
   kubernetesIngress:
     enabled: true
 
+# En el chart traefik/traefik 41.7.x el tipo del Service va en service.spec.type
+# (service.type se ignora). El nodePort lo fija ports.web.nodePort (30081).
 service:
-  type: NodePort
+  spec:
+    type: NodePort
 
 ports:
   web:
